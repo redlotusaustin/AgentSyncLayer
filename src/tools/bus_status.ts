@@ -7,7 +7,7 @@
 
 import { getRedisClient } from '../redis';
 import { hashProjectPath } from '../namespace';
-import { generateAgentId } from '../agent';
+import { getSessionAgentId } from '../session';
 import type {
   AgentStatus,
   ToolContext,
@@ -69,8 +69,8 @@ export async function busStatusExecute(
       };
     }
 
-    // Generate agent ID
-    const agentId = generateAgentId();
+    // Use session agent ID
+    const agentId = getSessionAgentId();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + STATUS_TTL_SECONDS * 1000);
 

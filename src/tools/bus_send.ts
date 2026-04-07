@@ -13,7 +13,7 @@ import { getRedisClient } from '../redis';
 import { hashProjectPath } from '../namespace';
 import { validateChannel, validateMessage, validateMessageType, ValidationException } from '../validation';
 import { RateLimiter } from '../rate-limiter';
-import { generateAgentId } from '../agent';
+import { getSessionAgentId } from '../session';
 import type {
   Message,
   MessagePayload,
@@ -22,19 +22,6 @@ import type {
   SendResponseData,
   MessageType,
 } from '../types';
-
-// Shared agent ID across session (regenerated once per session)
-let _sessionAgentId: string | null = null;
-
-/**
- * Get the session agent ID, generating it once on first call
- */
-function getSessionAgentId(): string {
-  if (!_sessionAgentId) {
-    _sessionAgentId = generateAgentId();
-  }
-  return _sessionAgentId;
-}
 
 // Rate limiter instance (shared across tool calls)
 const rateLimiter = new RateLimiter();

@@ -15,6 +15,12 @@ import type {
   AgentsResponseData,
 } from '../types';
 
+/** Maximum number of keys to scan per iteration */
+const SCAN_BATCH_SIZE = 100;
+
+/** Maximum total keys to scan (safety limit) */
+const SCAN_MAX_KEYS = 10000;
+
 /**
  * Execute bus_agents: list active agents with their status
  *
@@ -43,15 +49,15 @@ export async function busAgentsExecute(
     const agentPattern = `opencode:${projectHash}:agent:*`;
     const client = redis.getClient();
 
-    // SCAN for agent keys (100 at a time)
+    // SCAN for agent keys
     const agentKeys: string[] = [];
     let cursor = '0';
 
     do {
-      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', agentPattern, 'COUNT', 100);
+      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', agentPattern, 'COUNT', SCAN_BATCH_SIZE);
       cursor = nextCursor;
       agentKeys.push(...keys);
-    } while (cursor !== '0' && agentKeys.length < 1000); // Safety limit
+    } while (cursor !== '0' && agentKeys.length < SCAN_MAX_KEYS); // Safety limit
 
     if (agentKeys.length === 0) {
       return {

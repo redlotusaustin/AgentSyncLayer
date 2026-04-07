@@ -17,6 +17,12 @@
 
 import type { AgentStatus, Claim, Message } from './types';
 
+/** Maximum number of keys to scan per iteration */
+const SCAN_BATCH_SIZE = 100;
+
+/** Maximum total keys to scan (safety limit to prevent runaway scans) */
+const SCAN_MAX_KEYS = 10000;
+
 // Re-export tools for external access
 export {
   busSendExecute,
@@ -226,10 +232,10 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
     let cursor = '0';
 
     do {
-      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', agentPattern, 'COUNT', 100);
+      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', agentPattern, 'COUNT', SCAN_BATCH_SIZE);
       cursor = nextCursor;
       agentKeys.push(...keys);
-    } while (cursor !== '0' && agentKeys.length < 1000);
+    } while (cursor !== '0' && agentKeys.length < SCAN_MAX_KEYS);
 
     const statuses = await Promise.all(
       agentKeys.map(async (key) => {
@@ -268,10 +274,10 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
     let cursor = '0';
 
     do {
-      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', claimPattern, 'COUNT', 100);
+      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', claimPattern, 'COUNT', SCAN_BATCH_SIZE);
       cursor = nextCursor;
       claimKeys.push(...keys);
-    } while (cursor !== '0' && claimKeys.length < 1000);
+    } while (cursor !== '0' && claimKeys.length < SCAN_MAX_KEYS);
 
     const claims: Claim[] = [];
     const prefix = `opencode:${projectHash}:claim:`;
@@ -387,10 +393,10 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
     let cursor = '0';
 
     do {
-      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', claimPattern, 'COUNT', 100);
+      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', claimPattern, 'COUNT', SCAN_BATCH_SIZE);
       cursor = nextCursor;
       claimKeys.push(...keys);
-    } while (cursor !== '0' && claimKeys.length < 1000);
+    } while (cursor !== '0' && claimKeys.length < SCAN_MAX_KEYS);
 
     for (const claimKey of claimKeys) {
       const data = await client.get(claimKey);
