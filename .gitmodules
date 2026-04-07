@@ -1,0 +1,3 @@
+[submodule "build_docs"]
+	path = build_docs
+	url = ../build_docs.git
