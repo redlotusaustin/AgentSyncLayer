@@ -27,6 +27,13 @@ import type {
 const rateLimiter = new RateLimiter();
 
 /**
+ * Clean up rate limiter state (call on session end to prevent memory leaks)
+ */
+export function cleanupRateLimiter(): void {
+  rateLimiter.cleanup();
+}
+
+/**
  * Tool arguments for bus_send
  */
 export interface BusSendArgs {

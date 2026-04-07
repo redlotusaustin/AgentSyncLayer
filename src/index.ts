@@ -33,6 +33,7 @@ export {
   busClaimExecute,
   busReleaseExecute,
   busListenExecute,
+  cleanupRateLimiter,
 } from './tools';
 export type {
   BusSendArgs,
@@ -139,6 +140,7 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
   let HeartbeatManager: typeof import('./heartbeat').HeartbeatManager;
   let heartbeatManager: import('./heartbeat').HeartbeatManager | null = null;
   let connected = false;
+  let cleanupRateLimiter: (() => void) | null = null;
 
   // Track agent state for cleanup
   let agentId: string | null = null;
@@ -157,11 +159,13 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
     const namespace = await import('./namespace');
     const agent = await import('./agent');
     const heartbeat = await import('./heartbeat');
+    const tools = await import('./tools');
 
     getRedisClient = redis.getRedisClient;
     hashProjectPath = namespace.hashProjectPath;
     generateAgentId = agent.generateAgentId;
     HeartbeatManager = heartbeat.HeartbeatManager;
+    cleanupRateLimiter = tools.cleanupRateLimiter;
 
     agentId = generateAgentId();
     projectHash = hashProjectPath(directory);
@@ -654,6 +658,11 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
 
             // Release all claims
             await releaseAllClaims();
+          }
+
+          // Clean up rate limiter (prevent memory leak)
+          if (cleanupRateLimiter) {
+            cleanupRateLimiter();
           }
 
           connected = false;

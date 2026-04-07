@@ -11,26 +11,13 @@
 import { getRedisClient } from '../redis';
 import { hashProjectPath } from '../namespace';
 import { validateChannel, validateTimeout, ValidationException } from '../validation';
-import { generateAgentId } from '../agent';
+import { getSessionAgentId } from '../session';
 import type {
   Message,
   ToolContext,
   ToolResponse,
   ListenResponseData,
 } from '../types';
-
-// Shared agent ID across session (regenerated once per session)
-let _sessionAgentId: string | null = null;
-
-/**
- * Get the session agent ID, generating it once on first call
- */
-function getSessionAgentId(): string {
-  if (!_sessionAgentId) {
-    _sessionAgentId = generateAgentId();
-  }
-  return _sessionAgentId;
-}
 
 /**
  * Tool arguments for bus_listen

@@ -22,6 +22,9 @@ export { busClaimExecute } from './bus_claim';
 export { busReleaseExecute } from './bus_release';
 export { busListenExecute } from './bus_listen';
 
+// Cleanup functions
+export { cleanupRateLimiter } from './bus_send';
+
 // Tool argument types
 export type { BusSendArgs } from './bus_send';
 export type { BusReadArgs } from './bus_read';
