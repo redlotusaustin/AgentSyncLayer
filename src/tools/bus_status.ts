@@ -25,9 +25,9 @@ export interface BusStatusArgs {
 }
 
 /**
- * TTL for agent status in seconds (60s as per contract)
+ * TTL for agent status in seconds (90s as per contract)
  */
-const STATUS_TTL_SECONDS = 60;
+const STATUS_TTL_SECONDS = 90;
 
 /**
  * Execute bus_status: update this agent's status

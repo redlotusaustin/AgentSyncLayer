@@ -3,9 +3,11 @@
  *
  * Operations:
  * 1. SET NX with EX (atomic claim with TTL)
- * 2. Return conflict info if already claimed
+ * 2. Auto-publish claim event to "claims" channel
+ * 3. Return conflict info if already claimed
  */
 
+import * as crypto from 'crypto';
 import { getRedisClient } from '../redis';
 import { hashProjectPath } from '../namespace';
 import { validateFilePath, ValidationException } from '../validation';
@@ -16,6 +18,19 @@ import type {
   ClaimResponseData,
   ClaimConflictData,
 } from '../types';
+
+// Shared agent ID across session (regenerated once per session)
+let _sessionAgentId: string | null = null;
+
+/**
+ * Get the session agent ID, generating it once on first call
+ */
+function getSessionAgentId(): string {
+  if (!_sessionAgentId) {
+    _sessionAgentId = generateAgentId();
+  }
+  return _sessionAgentId;
+}
 
 /**
  * Tool arguments for bus_claim
@@ -28,6 +43,50 @@ export interface BusClaimArgs {
  * Default TTL for file claims (300 seconds / 5 minutes as per contract)
  */
 const CLAIM_TTL_SECONDS = 300;
+
+/**
+ * Claim event channel name for coordination events
+ */
+const CLAIMS_CHANNEL = 'claims';
+
+/**
+ * Publish a claim event message to the claims channel
+ */
+async function publishClaimEvent(
+  client: import('ioredis').Redis,
+  projectHash: string,
+  agentId: string,
+  filePath: string,
+  eventType: 'claim' | 'release'
+): Promise<void> {
+  const now = new Date().toISOString();
+  const messageObj = {
+    id: `evt-${crypto.randomUUID()}`,
+    from: agentId,
+    channel: CLAIMS_CHANNEL,
+    type: eventType,
+    payload: {
+      text: `${eventType === 'claim' ? 'Claimed' : 'Released'}: ${filePath}`,
+      path: filePath,
+      agentId,
+    },
+    timestamp: now,
+    project: projectHash,
+  };
+
+  const messageJson = JSON.stringify(messageObj);
+  const pubSubChannel = `opencode:${projectHash}:ch:${CLAIMS_CHANNEL}`;
+  const historyKey = `opencode:${projectHash}:history:${CLAIMS_CHANNEL}`;
+  const channelsKey = `opencode:${projectHash}:channels`;
+  const timestampMs = Date.now();
+
+  const pipeline = client.pipeline();
+  pipeline.publish(pubSubChannel, messageJson);
+  pipeline.zadd(historyKey, timestampMs, messageJson);
+  pipeline.zremrangebyrank(historyKey, 0, -501);
+  pipeline.sadd(channelsKey, CLAIMS_CHANNEL);
+  await pipeline.exec();
+}
 
 /**
  * Execute bus_claim: claim a file for editing
@@ -59,8 +118,8 @@ export async function busClaimExecute(
     // Validate path
     const filePath = validateFilePath(args.path);
 
-    // Generate agent ID
-    const agentId = generateAgentId();
+    // Use session agent ID (persists across all tool calls)
+    const agentId = getSessionAgentId();
 
     // Get project hash
     const projectHash = hashProjectPath(context.directory);
@@ -143,6 +202,9 @@ export async function busClaimExecute(
         code: 'CLAIM_CONFLICT',
       };
     }
+
+    // Publish claim event to claims channel for coordination
+    await publishClaimEvent(client, projectHash, agentId, filePath, 'claim');
 
     return {
       ok: true,

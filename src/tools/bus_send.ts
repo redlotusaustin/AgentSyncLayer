@@ -23,6 +23,19 @@ import type {
   MessageType,
 } from '../types';
 
+// Shared agent ID across session (regenerated once per session)
+let _sessionAgentId: string | null = null;
+
+/**
+ * Get the session agent ID, generating it once on first call
+ */
+function getSessionAgentId(): string {
+  if (!_sessionAgentId) {
+    _sessionAgentId = generateAgentId();
+  }
+  return _sessionAgentId;
+}
+
 // Rate limiter instance (shared across tool calls)
 const rateLimiter = new RateLimiter();
 
@@ -63,8 +76,8 @@ export async function busSendExecute(
     const message = validateMessage(args.message);
     const messageType = args.type ? validateMessageType(args.type) : 'info';
 
-    // Generate agent ID (could be cached in production)
-    const agentId = generateAgentId();
+    // Use session agent ID (persists across all tool calls)
+    const agentId = getSessionAgentId();
 
     // Rate limit check
     try {

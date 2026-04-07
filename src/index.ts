@@ -468,7 +468,7 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
           },
           type: {
             type: 'string',
-            enum: ['info', 'warning', 'error', 'question', 'announcement'],
+            enum: ['info', 'status', 'error', 'coordination', 'claim', 'release'],
             description: 'Message type (default: info)',
           },
         },
@@ -574,7 +574,7 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
           },
           timeout: {
             type: 'number',
-            description: 'Timeout in seconds (default: 10, max: 60)',
+            description: 'Timeout in seconds (default: 10, max: 30)',
           },
         },
       },

@@ -19,6 +19,19 @@ import type {
   ListenResponseData,
 } from '../types';
 
+// Shared agent ID across session (regenerated once per session)
+let _sessionAgentId: string | null = null;
+
+/**
+ * Get the session agent ID, generating it once on first call
+ */
+function getSessionAgentId(): string {
+  if (!_sessionAgentId) {
+    _sessionAgentId = generateAgentId();
+  }
+  return _sessionAgentId;
+}
+
 /**
  * Tool arguments for bus_listen
  */
@@ -68,8 +81,8 @@ export async function busListenExecute(
     // Validate timeout
     const timeoutSeconds = validateTimeout(args.timeout ?? DEFAULT_TIMEOUT_SECONDS);
 
-    // Get agent ID for self-filtering
-    const agentId = generateAgentId();
+    // Use session agent ID (persists across all tool calls) for self-filtering
+    const agentId = getSessionAgentId();
 
     // Get project hash
     const projectHash = hashProjectPath(context.directory);
