@@ -96,6 +96,7 @@ export async function busClaimExecute(
     const expiresAt = new Date(now.getTime() + CLAIM_TTL_SECONDS * 1000);
 
     const claim: Claim = {
+      path: filePath,
       agentId,
       claimedAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),

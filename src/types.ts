@@ -65,6 +65,8 @@ export interface AgentStatus {
  * File claim structure stored in Redis with TTL
  */
 export interface Claim {
+  /** File path being claimed */
+  path: string;
   /** Agent ID that holds the claim */
   agentId: string;
   /** ISO 8601 timestamp when claim was acquired */
