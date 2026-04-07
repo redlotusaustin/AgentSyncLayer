@@ -450,8 +450,136 @@ export default function AgentBusPlugin(context: PluginContext): AgentBusPlugin {
     console.warn('[AgentBus] Failed to start heartbeat:', error);
   });
 
-  // Build tool definitions (placeholder - actual tools loaded from ./tools)
-  const tools: ToolDefinition[] = [];
+  // Build tool definitions with proper input schemas
+  const tools: ToolDefinition[] = [
+    {
+      name: 'bus_send',
+      description: 'Publish a message to an AgentBus channel. Use this to communicate with other agents in the project.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          channel: {
+            type: 'string',
+            description: 'The channel name to publish to (e.g., "general", "claims", "tasks")',
+          },
+          message: {
+            type: 'string',
+            description: 'The message text to send',
+          },
+          type: {
+            type: 'string',
+            enum: ['info', 'warning', 'error', 'question', 'announcement'],
+            description: 'Message type (default: info)',
+          },
+        },
+        required: ['channel', 'message'],
+      },
+    },
+    {
+      name: 'bus_read',
+      description: 'Read recent messages from an AgentBus channel. Returns messages sorted newest first.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          channel: {
+            type: 'string',
+            description: 'The channel name to read from',
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum number of messages to return (default: 20)',
+          },
+        },
+        required: ['channel'],
+      },
+    },
+    {
+      name: 'bus_channels',
+      description: 'List all active channels in the current project. Shows channel names and message counts.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
+    {
+      name: 'bus_status',
+      description: 'Update this agent\'s status for other agents to see. Includes task description, files, and subscribed channels.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task: {
+            type: 'string',
+            description: 'Current task description (max 256 chars)',
+          },
+          files: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'List of file paths this agent is working on',
+          },
+          channels: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Channels this agent is subscribed to (default: ["general"])',
+          },
+        },
+        required: ['task'],
+      },
+    },
+    {
+      name: 'bus_agents',
+      description: 'List all active agents in the current project with their status and subscribed channels.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
+    {
+      name: 'bus_claim',
+      description: 'Claim a file for editing (advisory lock). Prevents other agents from editing the same file.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'The file path to claim',
+          },
+        },
+        required: ['path'],
+      },
+    },
+    {
+      name: 'bus_release',
+      description: 'Release a file claim. Must be the owner of the claim to release it.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'The file path to release',
+          },
+        },
+        required: ['path'],
+      },
+    },
+    {
+      name: 'bus_listen',
+      description: 'Long-poll for new messages on specified channels. Waits for new messages or times out.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          channels: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Channels to listen on (default: ["general"])',
+          },
+          timeout: {
+            type: 'number',
+            description: 'Timeout in seconds (default: 10, max: 60)',
+          },
+        },
+      },
+    },
+  ];
 
   // Return plugin hooks
   return {
