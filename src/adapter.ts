@@ -54,6 +54,25 @@ import {
 } from "./lifecycle";
 
 // ============================================================================
+// Bus Usage Instructions (injected into system prompt on every turn)
+// ============================================================================
+
+const BUS_INSTRUCTIONS: string[] = [
+  "## AgentBus — Inter-Agent Communication",
+  "You have access to AgentBus tools for coordinating with other agents in this project.",
+  "",
+  "**When to use the bus:**",
+  "- Before starting a task: use bus_status to announce what you are working on",
+  "- Before editing a file: use bus_claim to lock it (advisory), bus_release when done",
+  "- After completing work: use bus_send to notify other agents of progress or findings",
+  "- When blocked: use bus_send to ask other agents for help or context",
+  "- To check for messages: bus_read (recent), bus_history (deep archive), bus_search (full-text)",
+  "- To discover channels: bus_channels. To see who is active: bus_agents.",
+  "",
+  "Reply to unread message notifications promptly. Use bus_read to get full details.",
+];
+
+// ============================================================================
 // Helper: Convert OpenCode ToolContext to AgentBus ToolContext
 // ============================================================================
 
@@ -321,8 +340,12 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
       output.context.push(contextText);
     },
 
-    // System transform hook - inject unread notifications
+    // System transform hook - inject bus instructions + unread notifications
     "experimental.chat.system.transform": async (_input, output) => {
+      // Always inject bus usage instructions on every turn
+      output.system.push(...BUS_INSTRUCTIONS);
+
+      // Inject unread message notifications (requires SQLite)
       if (!state.projectHash || !state.directory) {
         return;
       }
