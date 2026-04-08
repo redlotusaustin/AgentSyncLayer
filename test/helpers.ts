@@ -11,6 +11,7 @@ import * as path from 'path';
 import * as os from 'os';
 import Redis from 'ioredis';
 import type { RedisClient } from '../src/redis';
+import { resetBusConfig } from '../src/config';
 
 // Test Redis configuration - use DB 15 for isolation
 const TEST_REDIS_URL = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
@@ -457,4 +458,78 @@ export function initializeTestSqliteSchema(db: Database): void {
       content=messages, content_rowid=rowid
     );
   `);
+}
+
+// ============================================================================
+// Config test helpers
+// ============================================================================
+
+import { resetBusConfig } from '../src/config';
+
+/**
+ * Create a temporary directory with optional .agentbus.json config.
+ *
+ * Useful for testing config resolution from CWD or env vars.
+ *
+ * @param config - Optional .agentbus.json content
+ * @returns Object with root path and cleanup function
+ *
+ * @example
+ * const { root, cleanup } = createTestBusEnv({ bus: '.' });
+ * // root/.agentbus.json will be created
+ * cleanup();
+ */
+export function createTestBusEnv(
+  config?: Record<string, string>
+): {
+  root: string;
+  cleanup: () => void;
+} {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-config-test-'));
+  if (config) {
+    fs.writeFileSync(path.join(root, '.agentbus.json'), JSON.stringify(config, null, 2));
+  }
+  return {
+    root,
+    cleanup: () => {
+      resetBusConfig();
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
+/**
+ * Create a temporary directory tree for ancestor walk tests.
+ *
+ * Creates: root/packages/api, root/packages/web
+ *
+ * @returns Object with paths and cleanup function
+ *
+ * @example
+ * const { root, sub1, sub2, cleanup } = createTestDirTree();
+ * // Create config in root
+ * fs.writeFileSync(path.join(root, '.agentbus.json'), '{}');
+ * // Test from sub1 - should find ancestor config
+ * cleanup();
+ */
+export function createTestDirTree(): {
+  root: string;
+  sub1: string;
+  sub2: string;
+  cleanup: () => void;
+} {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-tree-test-'));
+  const sub1 = path.join(root, 'packages', 'api');
+  const sub2 = path.join(root, 'packages', 'web');
+  fs.mkdirSync(sub1, { recursive: true });
+  fs.mkdirSync(sub2, { recursive: true });
+  return {
+    root,
+    sub1,
+    sub2,
+    cleanup: () => {
+      resetBusConfig();
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  };
 }
