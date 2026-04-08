@@ -41,7 +41,7 @@ import { HeartbeatManager } from "./heartbeat";
 import { getSessionAgentId } from "./session";
 import { getRedisClient } from "./redis";
 import { getSqliteClient, closeSqliteClient } from "./sqlite";
-import { hashProjectPath } from "./namespace";
+import { resolveBusConfig } from "./config";
 import { getLastSeenTimestamp, buildNotificationText } from "./tools/notifications";
 
 // Import lifecycle helpers
@@ -247,6 +247,7 @@ const bus_search = tool({
 
 interface PluginState {
   projectHash: string | null;
+  dbDir: string | null;
   heartbeatManager: HeartbeatManager | null;
   connected: boolean;
   directory: string | null;
@@ -255,6 +256,7 @@ interface PluginState {
 // Mutable plugin state
 const state: PluginState = {
   projectHash: null,
+  dbDir: null,
   heartbeatManager: null,
   connected: false,
   directory: null,
@@ -267,8 +269,12 @@ const state: PluginState = {
 export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
   const { directory } = input;
   const redis = getRedisClient();
-  const projectHash = hashProjectPath(directory);
+  const busConfig = resolveBusConfig(directory);
+  const projectHash = busConfig.projectHash;
+  const dbDir = busConfig.db_dir;
   const agentId = getSessionAgentId(); // Same ID as tools use!
+
+  console.log(`[AgentBus] Bus: ${projectHash} (source: ${busConfig.source}, bus_dir: ${busConfig.bus_dir}, db_dir: ${busConfig.db_dir})`);
 
   // Wait for Redis connection (max 5 seconds)
   try {
@@ -299,10 +305,11 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
   }
 
   state.projectHash = projectHash;
+  state.dbDir = dbDir;
   state.directory = directory;
 
   // Initialize SQLite client (optional, graceful degradation)
-  const sqlite = getSqliteClient(directory, projectHash);
+  const sqlite = getSqliteClient(dbDir, projectHash);
   if (!sqlite) {
     console.warn("[AgentBus] SQLite not available, running in Redis-only mode");
   }
@@ -346,12 +353,12 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
       output.system.push(...BUS_INSTRUCTIONS);
 
       // Inject unread message notifications (requires SQLite)
-      if (!state.projectHash || !state.directory) {
+      if (!state.projectHash || !state.dbDir) {
         return;
       }
 
       const agentId = getSessionAgentId();
-      const sqlite = getSqliteClient(state.directory, state.projectHash);
+      const sqlite = getSqliteClient(state.dbDir, state.projectHash);
       if (!sqlite) {
         return;
       }
@@ -400,9 +407,9 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
         cleanupRateLimiter();
 
         // Close SQLite connection
-        if (state.directory) {
-          closeSqliteClient(state.directory);
-          state.directory = null;
+        if (state.dbDir) {
+          closeSqliteClient(state.dbDir);
+          state.dbDir = null;
         }
 
         state.connected = false;
