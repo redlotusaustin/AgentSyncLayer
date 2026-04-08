@@ -84,8 +84,10 @@ export type ErrorCode =
   | 'CLAIM_CONFLICT'
   | 'CLAIM_NOT_FOUND'
   | 'PATH_INVALID'
+  | 'QUERY_INVALID'
   | 'RATE_LIMITED'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'SQLITE_UNAVAILABLE';
 
 /**
  * Common error response format
@@ -209,6 +211,36 @@ export interface ListenResponseData {
 }
 
 /**
+ * Response data for bus_history tool
+ */
+export interface HistoryResponseData {
+  messages: Message[];
+  count: number;
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+/**
+ * A single search result with message and metadata
+ */
+export interface SearchResult {
+  message: Message;
+  rank: number;
+  snippet: string;
+}
+
+/**
+ * Response data for bus_search tool
+ */
+export interface SearchResponseData {
+  results: SearchResult[];
+  count: number;
+  query: string;
+}
+
+/**
  * Rate limiter bucket structure
  */
 export interface RateLimiterBucket {
@@ -241,7 +273,7 @@ export type ToolExecute<T extends ToolArgs, R> = (args: T, context: ToolContext)
 /**
  * Redis key types for namespace construction
  */
-export type KeyType = 'ch' | 'history' | 'agent' | 'claim' | 'channels';
+export type KeyType = 'ch' | 'history' | 'agent' | 'claim' | 'channels' | 'lastseen';
 
 /**
  * Validation error structure

@@ -1,8 +1,8 @@
 # AgentBus
 
-**Redis-backed pub/sub messaging plugin for OpenCode agent coordination**
+**Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.1.0-init
+Version 0.2.0
 
 ---
 
@@ -45,7 +45,7 @@ When running multiple OpenCode agents on the same project, they operate in isola
 
 ## Features
 
-AgentBus provides 8 tools for agent coordination:
+AgentBus provides 10 tools for agent coordination:
 
 ### Messaging
 
@@ -55,6 +55,8 @@ AgentBus provides 8 tools for agent coordination:
 | `bus_read` | Read recent messages from a channel |
 | `bus_channels` | List all active channels in the project |
 | `bus_listen` | Long-poll for new messages (waits until arrival or timeout) |
+| `bus_history` | Read paginated deep message history from SQLite |
+| `bus_search` | Full-text search across message history |
 
 ### Coordination
 
@@ -432,13 +434,15 @@ All tools return JSON with a consistent envelope:
 
 | Code | Meaning | Recovery |
 |------|---------|----------|
-| `BUS_UNAVAILABLE` | Redis not connected | Wait and retry; check Redis is running |
+| `BUS_UNAVAILABLE` | Both Redis and SQLite are unavailable | Wait and retry; check Redis is running |
+| `SQLITE_UNAVAILABLE` | SQLite history/search not available | Continue without history; bus_send/read still work via Redis |
 | `CHANNEL_INVALID` | Channel name fails validation | Fix channel name (1-64 alphanumeric/hyphen/underscore) |
 | `CLAIM_CONFLICT` | File already claimed | Wait for expiry, negotiate, or proceed anyway |
 | `CLAIM_NOT_FOUND` | No claim exists | No action needed |
 | `PATH_INVALID` | File path fails validation | Fix path (relative, no `..`, no leading `/`) |
 | `RATE_LIMITED` | Too many messages per second | Wait before sending more |
-| `INTERNAL_ERROR` | Unexpected error | Check logs; may indicate Redis issue |
+| `QUERY_INVALID` | Search query is empty | Provide a non-empty search term |
+| `INTERNAL_ERROR` | Unexpected error | Check logs; may indicate Redis/SQLite issue |
 
 ### Tool Schemas
 
@@ -508,6 +512,26 @@ All tools return JSON with a consistent envelope:
 }
 ```
 
+#### bus_history
+
+```typescript
+{
+  channel?: string,        // optional, omit for all channels
+  page?: number,           // optional, 1-indexed, default 1
+  per_page?: number         // optional, 1-100, default 50
+}
+```
+
+#### bus_search
+
+```typescript
+{
+  query: string,           // required, search query text
+  channel?: string,        // optional, omit for all channels
+  limit?: number           // optional, 1-100, default 20
+}
+```
+
 ---
 
 ## Architecture
@@ -516,20 +540,38 @@ All tools return JSON with a consistent envelope:
 
 1. **Project isolation by default** — Namespace derived from path hash; no cross-project leakage
 2. **Advisory coordination** — Claims are hints, not enforced locks; agents cooperate voluntarily
-3. **Graceful degradation** — Redis unavailability doesn't crash agents; they continue in silent mode
-4. **Memory bounds** — Redis data is capped (500 messages/channel, TTLs on status/claims)
+3. **Graceful degradation** — Redis/SQLite unavailability doesn't crash agents; they continue in degraded mode
+4. **Memory bounds** — Redis data is capped (100 messages/channel, TTLs on status/claims); SQLite holds full history
+5. **Dual-write durability** — Messages written to both Redis (fast cache) and SQLite (durable storage)
 
 ### Redis Key Schema
 
-All keys use the prefix `opencode:{project_hash}:`:
+All keys use the prefix `opencode:{project_hash}`:
 
 | Key Pattern | Type | TTL | Purpose |
 |-------------|------|-----|---------|
 | `opencode:{hash}:ch:{channel}` | Pub/Sub | N/A | Real-time message delivery |
-| `opencode:{hash}:history:{channel}` | Sorted Set | None (capped) | Message history (max 500) |
+| `opencode:{hash}:history:{channel}` | Sorted Set | None (capped at 100) | Recent message cache |
 | `opencode:{hash}:channels` | Set | None | Active channel registry |
 | `opencode:{hash}:agent:{agentId}` | String | 90s | Agent status with heartbeat |
 | `opencode:{hash}:claim:{filePath}` | String | 300s | Advisory file claims |
+| `opencode:{hash}:lastseen:{agentId}` | String | 24h | Last-read timestamp for notifications |
+
+### SQLite Schema
+
+SQLite provides durable message persistence in `.agentbus/history.db`:
+
+| Table | Purpose |
+|-------|---------|
+| `messages` | Full message history with timestamps |
+| `messages_fts` | FTS5 virtual table for full-text search |
+| `channels` | Channel registry with message counts |
+
+**Features:**
+- WAL mode for concurrent reads during writes
+- FTS5 triggers auto-index message content for search
+- Indexes on `(channel, created_at)` and `(project, channel, created_at)`
+- Graceful degradation when SQLite unavailable
 
 ### Agent Identification
 
@@ -585,6 +627,21 @@ When OpenCode compacts a session, AgentBus injects coordination context:
 - src/auth/login.ts (expires 2026-04-06T14:06:00.000Z)
 ```
 
+### Unread Message Notifications
+
+The `experimental.chat.system.transform` hook proactively notifies agents of unread messages:
+
+- Retrieves last-seen timestamp from Redis (`opencode:{hash}:lastseen:{agentId}`)
+- Queries SQLite for messages newer than the timestamp
+- Groups by channel and injects compact notification into system prompt
+
+```
+[AgentBus] Unread messages:
+- general: 3 message(s) from devbox-49102-b3c4, devbox-48201-a7f2 — latest: "Finished the refactor"
+- claims: 1 message(s) from devbox-49102-b3c4 — latest: "Claimed src/auth/login.ts"
+Use bus_read to view details.
+```
+
 ### Cleanup on Session End
 
 When `session.idle` or `session.end` fires:
@@ -592,6 +649,7 @@ When `session.idle` or `session.end` fires:
 2. Delete agent status key
 3. Release all held claims
 4. Clean up rate limiter state
+5. Close SQLite connection
 
 ---
 
@@ -674,27 +732,43 @@ agentbus/
 │   ├── rate-limiter.ts    # Message rate limiting
 │   ├── redis.ts           # Redis client wrapper
 │   ├── session.ts         # Session agent ID management
-│   ├── validation.ts      # Input validation
+│   ├── sqlite.ts          # SQLite client with FTS5
 │   ├── types.ts           # TypeScript type definitions
+│   ├── validation.ts      # Input validation
+│   ├── adapter.ts         # OpenCode plugin adapter
+│   ├── lifecycle.ts       # Shared helpers for hooks
 │   └── tools/
 │       ├── index.ts       # Tool exports
-│       ├── bus_send.ts    # Publish message
-│       ├── bus_read.ts    # Read messages
+│       ├── bus_send.ts    # Publish message (dual-write)
+│       ├── bus_read.ts    # Read messages (SQLite fallback)
 │       ├── bus_channels.ts # List channels
 │       ├── bus_status.ts  # Update status
 │       ├── bus_agents.ts  # List agents
 │       ├── bus_claim.ts   # Claim file
 │       ├── bus_release.ts  # Release claim
-│       └── bus_listen.ts  # Long-poll messages
+│       ├── bus_listen.ts  # Long-poll messages
+│       ├── bus_history.ts # Paginated history (SQLite)
+│       ├── bus_search.ts  # Full-text search (FTS5)
+│       └── notifications.ts # Last-seen timestamp tracking
 └── test/
     ├── helpers.ts
+    ├── fixtures.ts
     ├── unit/
     │   ├── agent.test.ts
     │   ├── heartbeat.test.ts
     │   ├── namespace.test.ts
     │   ├── rate-limiter.test.ts
-    │   └── validation.test.ts
+    │   ├── validation.test.ts
+    │   ├── sqlite.test.ts
+    │   ├── bus_history.test.ts
+    │   ├── bus_search.test.ts
+    │   ├── notifications.test.ts
+    │   └── system-transform.test.ts
     └── integration/
+        ├── sqlite-dual-write.test.ts
+        ├── sqlite-fallback.test.ts
+        ├── sqlite-notifications.test.ts
+        └── sqlite-degradation.test.ts
 ```
 
 ### Running Tests

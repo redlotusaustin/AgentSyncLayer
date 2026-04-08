@@ -9,6 +9,9 @@
 import { getRedisClient } from '../redis';
 import { hashProjectPath } from '../namespace';
 import { validateChannel, validateLimit, ValidationException } from '../validation';
+import { getSqliteClient } from '../sqlite';
+import { getSessionAgentId } from '../session';
+import { updateLastSeenTimestamp } from './notifications';
 import type {
   Message,
   ToolContext,
@@ -37,40 +40,75 @@ export async function busReadExecute(
 ): Promise<ToolResponse<ReadResponseData>> {
   const redis = getRedisClient();
 
-  // Check Redis connection
-  if (!redis.checkConnection()) {
-    return {
-      ok: false,
-      error: 'Bus unavailable: Redis connection not established',
-      code: 'BUS_UNAVAILABLE',
-    };
-  }
-
   try {
     // Validate inputs
     const channel = validateChannel(args.channel);
     const limit = validateLimit(args.limit ?? 20);
 
-    // Get project hash
+    // Get project hash and agent ID
     const projectHash = hashProjectPath(context.directory);
+    const agentId = getSessionAgentId();
     const historyKey = `opencode:${projectHash}:history:${channel}`;
-    const client = redis.getClient();
 
-    // Execute ZREVRANGE and ZCARD in parallel
-    const [rangeResult, cardResult] = await Promise.all([
-      client.zrevrange(historyKey, 0, limit - 1),
-      client.zcard(historyKey),
-    ]);
+    // --- Phase 1: Try Redis cache (fast path) ---
+    let messages: Message[] = [];
+    let total = 0;
 
-    // Parse messages
-    const messages: Message[] = rangeResult.map((msg) => {
-      try {
-        return JSON.parse(msg) as Message;
-      } catch {
-        // Skip malformed messages
-        return null;
-      }
-    }).filter((msg): msg is Message => msg !== null);
+    if (redis.checkConnection()) {
+      const client = redis.getClient();
+      const [rangeResult, cardResult] = await Promise.all([
+        client.zrevrange(historyKey, 0, limit - 1),
+        client.zcard(historyKey),
+      ]);
+
+      // Parse messages, skipping malformed entries
+      messages = rangeResult
+        .map((msg) => {
+          try {
+            return JSON.parse(msg) as Message;
+          } catch {
+            return null;
+          }
+        })
+        .filter((msg): msg is Message => msg !== null);
+
+      total = cardResult;
+    }
+
+    // --- Phase 2: Fallback to SQLite if Redis empty ---
+    // 
+    // KNOWN LIMITATION: This fallback is triggered when Redis returns zero messages,
+    // not when Redis has "stale" data. If Redis has older messages but SQLite has
+    // newer ones, bus_read may return stale data. Per RFC, bus_read falls back to
+    // SQLite when Redis is "empty" (0 messages), not "stale". This is an acceptable
+    // trade-off given Redis serves as the fast cache and SQLite provides durability.
+    const sqlite = getSqliteClient(context.directory, projectHash);
+    if (messages.length === 0 && sqlite) {
+      const result = sqlite.getMessages({
+        projectHash,
+        channel,
+        limit,
+        offset: 0,
+      });
+      messages = result.messages;
+      total = result.total;
+    }
+
+    // --- Phase 3: Update last-seen timestamp ---
+    await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
+
+    // --- Phase 4: Check if either store was available ---
+    // If both stores are unavailable, return BUS_UNAVAILABLE
+    const redisWasAvailable = redis.checkConnection();
+    const sqliteAvailable = sqlite !== null;
+
+    if (!redisWasAvailable && !sqliteAvailable) {
+      return {
+        ok: false,
+        error: 'Bus unavailable: both Redis and SQLite are unreachable',
+        code: 'BUS_UNAVAILABLE' as const,
+      };
+    }
 
     return {
       ok: true,
@@ -78,7 +116,7 @@ export async function busReadExecute(
         channel,
         messages,
         count: messages.length,
-        total: cardResult,
+        total,
       },
     };
   } catch (error) {

@@ -4,7 +4,7 @@
  * Operations:
  * 1. Publish message to pub/sub channel
  * 2. Add message to sorted set history
- * 3. Prune history to 500 messages
+ * 3. Prune history to 100 messages (SQLite holds full history)
  * 4. Add channel to active channels set
  */
 
@@ -14,6 +14,8 @@ import { hashProjectPath } from '../namespace';
 import { validateChannel, validateMessage, validateMessageType, ValidationException } from '../validation';
 import { RateLimiter } from '../rate-limiter';
 import { getSessionAgentId } from '../session';
+import { getSqliteClient } from '../sqlite';
+import { updateLastSeenTimestamp } from './notifications';
 import type {
   Message,
   MessagePayload,
@@ -53,17 +55,6 @@ export async function busSendExecute(
   args: BusSendArgs,
   context: ToolContext
 ): Promise<ToolResponse<SendResponseData>> {
-  const redis = getRedisClient();
-
-  // Check Redis connection
-  if (!redis.checkConnection()) {
-    return {
-      ok: false,
-      error: 'Bus unavailable: Redis connection not established',
-      code: 'BUS_UNAVAILABLE',
-    };
-  }
-
   try {
     // Validate inputs
     const channel = validateChannel(args.channel);
@@ -105,7 +96,42 @@ export async function busSendExecute(
       project: projectHash,
     };
 
+    // --- Phase 1: Durable write to SQLite (BEFORE Redis check per RFC degradation table) ---
+    let sqliteWriteSucceeded = false;
+    const sqlite = getSqliteClient(context.directory, projectHash);
+    if (sqlite) {
+      try {
+        sqlite.insertMessage(messageObj);
+        sqliteWriteSucceeded = true;
+      } catch (error) {
+        console.warn('[bus_send] SQLite write failed, continuing with Redis only:', error);
+      }
+    }
+
     const messageJson = JSON.stringify(messageObj);
+    const redis = getRedisClient();
+
+    // Check Redis connection - if down, SQLite fallback provides durability
+    if (!redis.checkConnection()) {
+      if (sqliteWriteSucceeded) {
+        // Redis is down but SQLite succeeded - message is durable
+        return {
+          ok: true,
+          data: {
+            id: messageId,
+            channel,
+            timestamp,
+          },
+        };
+      }
+      // Both failed - bus is truly unavailable
+      return {
+        ok: false,
+        error: 'Bus unavailable: Redis connection not established',
+        code: 'BUS_UNAVAILABLE',
+      };
+    }
+
     const client = redis.getClient();
 
     // Use pipeline for atomic operations
@@ -121,14 +147,21 @@ export async function busSendExecute(
     pipeline.zadd(historyKey, timestampMs, messageJson);
 
     // 3. ZREMRANGEBYRANK to prune to 500 messages (keep newest 500)
-    pipeline.zremrangebyrank(historyKey, 0, -501);
+    pipeline.zremrangebyrank(historyKey, 0, -101);
 
     // 4. SADD channel to active channels set
     const channelsKey = `opencode:${projectHash}:channels`;
     pipeline.sadd(channelsKey, channel);
 
     // Execute pipeline
-    await pipeline.exec();
+    const results = await pipeline.exec();
+    const pipelineErrors = results?.filter(([err]) => err !== null);
+    if (pipelineErrors && pipelineErrors.length > 0) {
+      console.warn('[bus_send] Redis pipeline had errors:', pipelineErrors);
+    }
+
+    // Also update last-seen timestamp for the sending agent
+    await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
 
     return {
       ok: true,

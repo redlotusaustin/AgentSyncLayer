@@ -1,0 +1,3 @@
+node_modules\n*.db\n.agentbus/
+# AgentBus runtime data
+.agentbus/

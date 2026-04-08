@@ -28,6 +28,8 @@ import {
   busClaimExecute,
   busReleaseExecute,
   busListenExecute,
+  busHistoryExecute,
+  busSearchExecute,
   cleanupRateLimiter,
 } from "./tools";
 
@@ -38,7 +40,9 @@ import type { ToolContext as AgentBusToolContext } from "./types";
 import { HeartbeatManager } from "./heartbeat";
 import { getSessionAgentId } from "./session";
 import { getRedisClient } from "./redis";
+import { getSqliteClient, closeSqliteClient } from "./sqlite";
 import { hashProjectPath } from "./namespace";
+import { getLastSeenTimestamp, buildNotificationText } from "./tools/notifications";
 
 // Import lifecycle helpers
 import {
@@ -186,6 +190,38 @@ const bus_listen = tool({
   },
 });
 
+/**
+ * bus_history — Read deep message history from SQLite
+ */
+const bus_history = tool({
+  description: "Read deep message history from SQLite. Returns paginated results sorted newest first. Use this to review past coordination or find messages older than what bus_read returns.",
+  args: {
+    channel: z.string().min(1).max(64).optional().describe("Channel to filter by (omit for all channels)"),
+    page: z.number().int().min(1).optional().describe("Page number (1-indexed, default: 1)"),
+    per_page: z.number().int().min(1).max(100).optional().describe("Messages per page (default: 50)"),
+  },
+  async execute(args, context) {
+    const result = await busHistoryExecute(args, toAgentBusContext(context));
+    return responseToString(result);
+  },
+});
+
+/**
+ * bus_search — Search message history using full-text search
+ */
+const bus_search = tool({
+  description: "Search message history using full-text search. Returns messages matching the query, ranked by relevance.",
+  args: {
+    query: z.string().min(1).max(256).describe("Search query text"),
+    channel: z.string().min(1).max(64).optional().describe("Channel to filter by (omit for all channels)"),
+    limit: z.number().int().min(1).max(100).optional().describe("Maximum results (default: 20)"),
+  },
+  async execute(args, context) {
+    const result = await busSearchExecute(args, toAgentBusContext(context));
+    return responseToString(result);
+  },
+});
+
 // ============================================================================
 // Plugin State
 // ============================================================================
@@ -194,6 +230,7 @@ interface PluginState {
   projectHash: string | null;
   heartbeatManager: HeartbeatManager | null;
   connected: boolean;
+  directory: string | null;
 }
 
 // Mutable plugin state
@@ -201,6 +238,7 @@ const state: PluginState = {
   projectHash: null,
   heartbeatManager: null,
   connected: false,
+  directory: null,
 };
 
 // ============================================================================
@@ -242,6 +280,13 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
   }
 
   state.projectHash = projectHash;
+  state.directory = directory;
+
+  // Initialize SQLite client (optional, graceful degradation)
+  const sqlite = getSqliteClient(directory, projectHash);
+  if (!sqlite) {
+    console.warn("[AgentBus] SQLite not available, running in Redis-only mode");
+  }
 
   return {
     tool: {
@@ -253,6 +298,8 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
       bus_claim,
       bus_release,
       bus_listen,
+      bus_history,
+      bus_search,
     },
 
     // Session compaction hook - inject coordination context
@@ -272,6 +319,39 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
 
       const contextText = formatCompactionContext(agents, myClaims, recentMessages);
       output.context.push(contextText);
+    },
+
+    // System transform hook - inject unread notifications
+    "experimental.chat.system.transform": async (_input, output) => {
+      if (!state.projectHash || !state.directory) {
+        return;
+      }
+
+      const agentId = getSessionAgentId();
+      const sqlite = getSqliteClient(state.directory, state.projectHash);
+      if (!sqlite) {
+        return;
+      }
+
+      const lastSeen = await getLastSeenTimestamp(state.projectHash, agentId);
+      const unread = sqlite.getMessagesSince({
+        projectHash: state.projectHash,
+        sinceUnixMs: lastSeen,
+        limit: 50,
+      });
+
+      if (unread.length === 0) {
+        return;
+      }
+
+      // Build notification lines using shared function
+      const lines = buildNotificationText(unread);
+      if (!lines) {
+        return;
+      }
+
+      // Append notification lines to system array
+      output.system.push(...lines);
     },
 
     // Event handler for cleanup
@@ -295,6 +375,12 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
 
         // Clean up rate limiter
         cleanupRateLimiter();
+
+        // Close SQLite connection
+        if (state.directory) {
+          closeSqliteClient(state.directory);
+          state.directory = null;
+        }
 
         state.connected = false;
       }

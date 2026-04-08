@@ -5,8 +5,12 @@
  * All integration tests should use these helpers to ensure clean state.
  */
 
+import { Database } from 'bun:sqlite';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import Redis from 'ioredis';
-import type { RedisClient } from '../../src/redis';
+import type { RedisClient } from '../src/redis';
 
 // Test Redis configuration - use DB 15 for isolation
 const TEST_REDIS_URL = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
@@ -37,7 +41,7 @@ export function createTestRedisClient(): Redis {
  * Create a RedisClient wrapper for testing
  */
 export async function createTestRedisWrapper(): Promise<RedisClient> {
-  const { RedisClient } = await import('../../src/redis');
+  const { RedisClient } = await import('../src/redis');
   const client = new RedisClient({
     url: buildTestRedisUrl(),
     maxRetries: 3,
@@ -68,9 +72,12 @@ export interface TestContext {
 /**
  * Set up a fresh test context with isolated Redis connection
  *
+ * This also sets the RedisClient singleton used by bus tools,
+ * so that busSendExecute, busReadExecute, etc. use the same connection.
+ *
  * Usage:
  *   describe('Redis operations', () => {
- *     const ctx = setupTestContext();
+ *     const ctx = createTestContext();
  *
  *     beforeAll(async () => {
  *       await ctx.setup();
@@ -83,6 +90,7 @@ export interface TestContext {
  */
 export function createTestContext(): TestContext {
   let redis: Redis | null = null;
+  let originalRedisClient: { getClient: () => Redis; checkConnection: () => boolean } | null = null;
 
   return {
     get redis(): Redis {
@@ -93,9 +101,32 @@ export function createTestContext(): TestContext {
     },
 
     async setup(): Promise<void> {
+      // Import RedisClient and set it as the default
+      const { RedisClient, setRedisClient, getRedisClient } = await import('../src/redis');
+
+      // Save original client if exists
+      try {
+        originalRedisClient = getRedisClient();
+      } catch {
+        // No existing client
+      }
+
+      // Create new RedisClient for tests with DB 15
+      const testClient = new RedisClient({
+        url: buildTestRedisUrl(),
+        maxRetries: 3,
+        retryDelayMs: 100,
+      });
+
+      // Wait for connection
+      await testClient.waitForConnection(5000);
+
+      // Set as default client for bus tools
+      setRedisClient(testClient);
+
+      // Also create the raw Redis client for direct operations
       redis = createTestRedisClient();
       await redis.connect();
-      // Wait for connection using ping instead of wait('ready')
       await redis.ping();
     },
 
@@ -109,6 +140,13 @@ export function createTestContext(): TestContext {
           // Ignore cleanup errors
         }
         redis = null;
+      }
+
+      // Restore original RedisClient if it existed
+      if (originalRedisClient) {
+        const { setRedisClient } = await import('../src/redis');
+        setRedisClient(originalRedisClient as any);
+        originalRedisClient = null;
       }
     },
 
@@ -169,6 +207,16 @@ export async function isRedisAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Get the project hash for a test directory
+ * This mirrors what the bus tools do internally
+ */
+export async function getTestProjectHash(directory: string): Promise<string> {
+  // Dynamic import to avoid circular dependencies
+  const { hashProjectPath } = await import('../src/namespace');
+  return hashProjectPath(directory);
 }
 
 /**
@@ -234,4 +282,179 @@ export class MockTime {
   now(): number {
     return this.currentTime;
   }
+}
+
+/**
+ * SQLite test database configuration
+ */
+const TEST_DB_PATH = '.agentbus/history.db';
+
+/**
+ * Create a test SQLite database in a temporary directory
+ *
+ * Usage:
+ *   const { db, dir, cleanup } = createTestSqliteDb();
+ *   // use db...
+ *   cleanup(); // when done
+ *
+ * @returns Object containing the Database instance, temp directory path, and cleanup function
+ */
+export function createTestSqliteDb(): {
+  db: Database;
+  dir: string;
+  dbPath: string;
+  cleanup: () => void;
+} {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-test-'));
+  const dbDir = path.join(dir, '.agentbus');
+  fs.mkdirSync(dbDir, { recursive: true });
+  const dbPath = path.join(dbDir, 'history.db');
+  const db = new Database(dbPath);
+  db.exec('PRAGMA journal_mode = WAL');
+
+  return {
+    db,
+    dir,
+    dbPath,
+    cleanup: () => {
+      try {
+        db.close();
+      } catch {
+        // Already closed
+      }
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // Directory may not exist
+      }
+    },
+  };
+}
+
+/**
+ * Test context for SQLite tests
+ */
+export interface TestSqliteContext {
+  db: Database;
+  dir: string;
+  dbPath: string;
+  cleanup: () => Promise<void>;
+}
+
+/**
+ * Create an async test context for SQLite tests
+ *
+ * Usage:
+ *   const ctx = createTestSqliteContext();
+ *   beforeAll(async () => { await ctx.setup(); });
+ *   afterAll(async () => { await ctx.teardown(); });
+ */
+export function createTestSqliteContext(): TestSqliteContext {
+  let tempDir: string | null = null;
+
+  return {
+    get db(): Database {
+      if (!tempDir) {
+        throw new Error('Test SQLite context not initialized. Call setup() first.');
+      }
+      const dbPath = path.join(tempDir, '.agentbus', 'history.db');
+      return new Database(dbPath);
+    },
+
+    get dir(): string {
+      if (!tempDir) {
+        throw new Error('Test SQLite context not initialized. Call setup() first.');
+      }
+      return tempDir;
+    },
+
+    get dbPath(): string {
+      if (!tempDir) {
+        throw new Error('Test SQLite context not initialized. Call setup() first.');
+      }
+      return path.join(tempDir, '.agentbus', 'history.db');
+    },
+
+    async setup(): Promise<void> {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-test-'));
+      const dbDir = path.join(tempDir, '.agentbus');
+      fs.mkdirSync(dbDir, { recursive: true });
+      const dbPath = path.join(dbDir, 'history.db');
+      // Create and close to ensure schema is initialized
+      const db = new Database(dbPath);
+      db.exec('PRAGMA journal_mode = WAL');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS messages (
+          id TEXT PRIMARY KEY,
+          channel TEXT NOT NULL,
+          "from" TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'info',
+          payload TEXT NOT NULL,
+          timestamp TEXT NOT NULL,
+          project TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_messages_project ON messages(project, channel, created_at DESC);
+        CREATE TABLE IF NOT EXISTS channels (
+          name TEXT PRIMARY KEY,
+          project TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          message_count INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_channels_project ON channels(project);
+        CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+          id UNINDEXED, channel, "from", type UNINDEXED, payload,
+          content=messages, content_rowid=rowid
+        );
+      `);
+      db.close();
+    },
+
+    async cleanup(): Promise<void> {
+      if (tempDir) {
+        try {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch {
+          // Directory may not exist
+        }
+        tempDir = null;
+      }
+    },
+
+    async teardown(): Promise<void> {
+      await this.cleanup();
+    },
+  };
+}
+
+/**
+ * Initialize SQLite schema on an existing database connection
+ */
+export function initializeTestSqliteSchema(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      channel TEXT NOT NULL,
+      "from" TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'info',
+      payload TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      project TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_messages_project ON messages(project, channel, created_at DESC);
+    CREATE TABLE IF NOT EXISTS channels (
+      name TEXT PRIMARY KEY,
+      project TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      message_count INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_channels_project ON channels(project);
+    CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+      id UNINDEXED, channel, "from", type UNINDEXED, payload,
+      content=messages, content_rowid=rowid
+    );
+  `);
 }

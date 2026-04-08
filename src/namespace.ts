@@ -116,6 +116,14 @@ export class KeyBuilder {
   }
 
   /**
+   * Build a last-seen timestamp key
+   * Format: opencode:{hash}:lastseen:{agentId}
+   */
+  lastseen(agentId: string): string {
+    return `${this.prefix}:lastseen:${agentId}`;
+  }
+
+  /**
    * Build a pattern for SCAN operations
    * @param type - The key type to match
    * @param suffix - Optional suffix pattern
@@ -156,7 +164,7 @@ export function extractKeyType(key: string, projectHash: string): KeyType | null
 
   if (parts.length >= 1) {
     const type = parts[0] as KeyType;
-    if (['ch', 'history', 'agent', 'claim', 'channels'].includes(type)) {
+    if (['ch', 'history', 'agent', 'claim', 'channels', 'lastseen'].includes(type)) {
       return type;
     }
   }
