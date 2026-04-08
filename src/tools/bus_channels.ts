@@ -7,7 +7,7 @@
  */
 
 import { getRedisClient } from '../redis';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash } from '../config';
 import type {
   ChannelInfo,
   ToolContext,
@@ -39,7 +39,7 @@ export async function busChannelsExecute(
 
   try {
     // Get project hash
-    const projectHash = hashProjectPath(context.directory);
+    const projectHash = resolveProjectHash(context.directory);
     const channelsKey = `opencode:${projectHash}:channels`;
     const client = redis.getClient();
 

@@ -6,7 +6,7 @@
  */
 
 import { getRedisClient } from '../redis';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash } from '../config';
 import { getSessionAgentId } from '../session';
 import type {
   AgentStatus,
@@ -86,7 +86,7 @@ export async function busStatusExecute(
     };
 
     // Get project hash
-    const projectHash = hashProjectPath(context.directory);
+    const projectHash = resolveProjectHash(context.directory);
     const agentKey = `opencode:${projectHash}:agent:${agentId}`;
     const client = redis.getClient();
 

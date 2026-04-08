@@ -11,7 +11,7 @@
  * Pagination: Uses page number (1-indexed) and per_page count.
  */
 import { getSqliteClient } from '../sqlite';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash, resolveDbDir } from '../config';
 import { validateChannel, validateLimit, ValidationException } from '../validation';
 import { getSessionAgentId } from '../session';
 import { updateLastSeenTimestamp } from './notifications';
@@ -61,7 +61,7 @@ export async function busHistoryExecute(
   args: BusHistoryArgs,
   context: ToolContext
 ): Promise<ToolResponse<HistoryResponseData>> {
-  const projectHash = hashProjectPath(context.directory);
+  const projectHash = resolveProjectHash(context.directory);
 
   try {
     // Validate and clamp inputs
@@ -71,7 +71,7 @@ export async function busHistoryExecute(
     const offset = (page - 1) * perPage;
 
     // Get SQLite client
-    const sqlite = getSqliteClient(context.directory, projectHash);
+    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
     if (!sqlite) {
       return {
         ok: false,

@@ -17,7 +17,7 @@
  */
 
 import { getSqliteClient } from '../sqlite';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash, resolveDbDir } from '../config';
 import { validateChannel, validateLimit, ValidationException } from '../validation';
 import type {
   ToolContext,
@@ -65,7 +65,7 @@ export async function busSearchExecute(
   args: BusSearchArgs,
   context: ToolContext
 ): Promise<ToolResponse<SearchResponseData>> {
-  const projectHash = hashProjectPath(context.directory);
+  const projectHash = resolveProjectHash(context.directory);
 
   try {
     // Validate query is non-empty
@@ -83,7 +83,7 @@ export async function busSearchExecute(
     const query = args.query.trim();
 
     // Get SQLite client
-    const sqlite = getSqliteClient(context.directory, projectHash);
+    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
     if (!sqlite) {
       return {
         ok: false,

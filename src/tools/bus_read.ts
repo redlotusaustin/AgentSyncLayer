@@ -7,7 +7,7 @@
  */
 
 import { getRedisClient } from '../redis';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash, resolveDbDir } from '../config';
 import { validateChannel, validateLimit, ValidationException } from '../validation';
 import { getSqliteClient } from '../sqlite';
 import { getSessionAgentId } from '../session';
@@ -46,7 +46,7 @@ export async function busReadExecute(
     const limit = validateLimit(args.limit ?? 20);
 
     // Get project hash and agent ID
-    const projectHash = hashProjectPath(context.directory);
+    const projectHash = resolveProjectHash(context.directory);
     const agentId = getSessionAgentId();
     const historyKey = `opencode:${projectHash}:history:${channel}`;
 
@@ -82,7 +82,7 @@ export async function busReadExecute(
     // newer ones, bus_read may return stale data. Per RFC, bus_read falls back to
     // SQLite when Redis is "empty" (0 messages), not "stale". This is an acceptable
     // trade-off given Redis serves as the fast cache and SQLite provides durability.
-    const sqlite = getSqliteClient(context.directory, projectHash);
+    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
     if (messages.length === 0 && sqlite) {
       const result = sqlite.getMessages({
         projectHash,

@@ -9,7 +9,7 @@
 
 import * as crypto from 'crypto';
 import { getRedisClient } from '../redis';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash } from '../config';
 import { validateFilePath, ValidationException } from '../validation';
 import { getSessionAgentId } from '../session';
 import type {
@@ -157,7 +157,7 @@ export async function busClaimExecute(
     const agentId = getSessionAgentId();
 
     // Get project hash
-    const projectHash = hashProjectPath(context.directory);
+    const projectHash = resolveProjectHash(context.directory);
     const claimKey = `opencode:${projectHash}:claim:${filePath}`;
     const client = redis.getClient();
 
