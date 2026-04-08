@@ -18,6 +18,7 @@ export { busReadExecute } from './bus_read';
 export { busChannelsExecute } from './bus_channels';
 export { busStatusExecute } from './bus_status';
 export { busAgentsExecute } from './bus_agents';
+export { busInfoExecute } from './bus_info';
 export { busClaimExecute } from './bus_claim';
 export { busReleaseExecute } from './bus_release';
 export { busListenExecute } from './bus_listen';

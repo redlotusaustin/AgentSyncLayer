@@ -25,6 +25,7 @@ import {
   busChannelsExecute,
   busStatusExecute,
   busAgentsExecute,
+  busInfoExecute,
   busClaimExecute,
   busReleaseExecute,
   busListenExecute,
@@ -162,6 +163,18 @@ const bus_agents = tool({
   args: {},
   async execute(_args, context) {
     const result = await busAgentsExecute({}, toAgentBusContext(context));
+    return responseToString(result);
+  },
+});
+
+/**
+ * bus_info — Get AgentBus configuration info
+ */
+const bus_info = tool({
+  description: "Get AgentBus configuration info for the current project. Returns project hash, bus directory, db directory, and config source.",
+  args: {},
+  async execute(_args, context) {
+    const result = await busInfoExecute({}, toAgentBusContext(context));
     return responseToString(result);
   },
 });
@@ -321,6 +334,7 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
       bus_channels,
       bus_status,
       bus_agents,
+      bus_info,
       bus_claim,
       bus_release,
       bus_listen,
