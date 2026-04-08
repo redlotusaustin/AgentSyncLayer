@@ -2,7 +2,7 @@
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.2.0
+Version 0.3.0
 
 ---
 
@@ -45,7 +45,7 @@ When running multiple OpenCode agents on the same project, they operate in isola
 
 ## Features
 
-AgentBus provides 10 tools for agent coordination:
+AgentBus provides 11 tools for agent coordination:
 
 ### Messaging
 
@@ -64,6 +64,7 @@ AgentBus provides 10 tools for agent coordination:
 |------|-------------|
 | `bus_status` | Update your agent's status (task, files, channels) |
 | `bus_agents` | List all active agents in the project |
+| `bus_info` | Get resolved bus configuration (bus directory, project hash, config source) |
 
 ### File Claims
 
@@ -138,6 +139,7 @@ AgentBus integrates as an OpenCode plugin. The exact loading mechanism depends o
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AGENTBUS_REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
+| `AGENTBUS_BUS_ID` | _(none)_ | Override bus identity with a directory path. Takes highest precedence over config files. |
 
 **Examples:**
 
@@ -162,8 +164,39 @@ AgentBus automatically isolates traffic by project. Each project gets a unique n
 
 This means:
 - Agents on `/home/dev/projects/myapp` cannot see agents on `/home/dev/projects/other-app`
-- No configuration required—isolation is automatic
+- No configuration required—isolation is automatic for single-project setups
 - Symlinks to the same directory share the same namespace
+
+### Shared Bus Configuration
+
+For monorepos and multi-project setups, you can share a bus namespace across different directories using a `.agentbus.json` config file:
+
+```json
+{
+  "bus": "/path/to/shared/root"
+}
+```
+
+**How it works:**
+1. AgentBus walks up from the current directory to find `.agentbus.json`
+2. The config file's `bus` directory determines the project hash
+3. All agents pointing to the same `bus` directory share the same Redis namespace and SQLite database
+
+**Example: Monorepo**
+
+Place `.agentbus.json` at the monorepo root:
+
+```json
+// /mono/.agentbus.json
+{ "bus": "." }
+```
+
+Now agents in `/mono/packages/api` and `/mono/packages/web` share the same bus, see each other's messages, and use the same SQLite history database.
+
+**Configuration precedence (highest to lowest):**
+1. `AGENTBUS_BUS_ID` environment variable
+2. `.agentbus.json` discovered via ancestor walk
+3. Default: use current working directory
 
 ---
 
@@ -487,6 +520,14 @@ All tools return JSON with a consistent envelope:
 {}  // No arguments
 ```
 
+#### bus_info
+
+```typescript
+{}  // No arguments
+```
+
+Returns the resolved bus configuration including project hash, bus directory, database directory, and config source.
+
 #### bus_claim
 
 ```typescript
@@ -714,7 +755,34 @@ bus_send(channel="my-channel", message="Hello")
 
 **Cause**: Different project namespaces.
 
-**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path).
+**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). In monorepos, ensure `.agentbus.json` is at the shared root.
+
+### Verifying bus configuration
+
+**Use `bus_info`** to see which bus namespace your agent is connected to:
+
+```
+bus_info()
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "data": {
+    "projectHash": "a1b2c3d4e5f6",
+    "bus_dir": "/home/user/monorepo",
+    "db_dir": "/home/user/monorepo",
+    "source": "config",
+    "configPath": "/home/user/monorepo/.agentbus.json"
+  }
+}
+```
+
+The `source` field shows how the bus was resolved:
+- `env` — From `AGENTBUS_BUS_ID` environment variable
+- `config` — From `.agentbus.json` file
+- `default` — From current working directory
 
 ---
 
@@ -737,6 +805,7 @@ agentbus/
 │   ├── validation.ts      # Input validation
 │   ├── adapter.ts         # OpenCode plugin adapter
 │   ├── lifecycle.ts       # Shared helpers for hooks
+│   ├── config.ts          # Bus config resolution (.agentbus.json, env vars)
 │   └── tools/
 │       ├── index.ts       # Tool exports
 │       ├── bus_send.ts    # Publish message (dual-write)
@@ -744,6 +813,7 @@ agentbus/
 │       ├── bus_channels.ts # List channels
 │       ├── bus_status.ts  # Update status
 │       ├── bus_agents.ts  # List agents
+│       ├── bus_info.ts    # Bus configuration info
 │       ├── bus_claim.ts   # Claim file
 │       ├── bus_release.ts  # Release claim
 │       ├── bus_listen.ts  # Long-poll messages
