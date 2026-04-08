@@ -1,6 +1,6 @@
 {
   "name": "agentbus",
-  "version": "0.1.0-init",
+  "version": "0.2.0",
   "description": "Redis-backed pub/sub messaging for coordinating multiple AI agent sessions",
   "type": "module",
   "main": "src/index.ts",
