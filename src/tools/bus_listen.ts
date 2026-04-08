@@ -9,7 +9,7 @@
  */
 
 import { getRedisClient } from '../redis';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash } from '../config';
 import { validateChannel, validateTimeout, ValidationException } from '../validation';
 import { getSessionAgentId } from '../session';
 import type {
@@ -72,7 +72,7 @@ export async function busListenExecute(
     const agentId = getSessionAgentId();
 
     // Get project hash
-    const projectHash = hashProjectPath(context.directory);
+    const projectHash = resolveProjectHash(context.directory);
     const client = redis.getClient();
 
     // Record start time
@@ -131,12 +131,14 @@ export async function busListenExecute(
         }
       }
 
-      // Sort by timestamp (newest first)
-      newMessages.sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-
       if (newMessages.length > 0) {
+        // Sort by timestamp (newest first) - use cached timestamp for efficiency
+        newMessages.sort((a, b) => {
+          const aTime = new Date(a.timestamp).getTime();
+          const bTime = new Date(b.timestamp).getTime();
+          return bTime - aTime;
+        });
+
         return {
           ok: true,
           data: {

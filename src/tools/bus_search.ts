@@ -17,7 +17,7 @@
  */
 
 import { getSqliteClient } from '../sqlite';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash, resolveDbDir } from '../config';
 import { validateChannel, validateLimit, ValidationException } from '../validation';
 import type {
   ToolContext,
@@ -65,11 +65,12 @@ export async function busSearchExecute(
   args: BusSearchArgs,
   context: ToolContext
 ): Promise<ToolResponse<SearchResponseData>> {
-  const projectHash = hashProjectPath(context.directory);
+  const projectHash = resolveProjectHash(context.directory);
 
   try {
     // Validate query is non-empty
-    if (!args.query || args.query.trim().length === 0) {
+    const trimmedQuery = args.query?.trim() ?? '';
+    if (trimmedQuery.length === 0) {
       return {
         ok: false,
         error: 'Search query cannot be empty',
@@ -80,10 +81,10 @@ export async function busSearchExecute(
     // Validate and clamp inputs
     const channel = args.channel ? validateChannel(args.channel) : null;
     const limit = validateLimit(args.limit ?? DEFAULT_SEARCH_LIMIT);
-    const query = args.query.trim();
+    const query = trimmedQuery;
 
     // Get SQLite client
-    const sqlite = getSqliteClient(context.directory, projectHash);
+    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
     if (!sqlite) {
       return {
         ok: false,

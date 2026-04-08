@@ -10,7 +10,7 @@
 
 import * as crypto from 'crypto';
 import { getRedisClient } from '../redis';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash, resolveDbDir } from '../config';
 import { validateChannel, validateMessage, validateMessageType, ValidationException } from '../validation';
 import { RateLimiter } from '../rate-limiter';
 import { getSessionAgentId } from '../session';
@@ -79,7 +79,7 @@ export async function busSendExecute(
     }
 
     // Get project hash
-    const projectHash = hashProjectPath(context.directory);
+    const projectHash = resolveProjectHash(context.directory);
 
     // Generate message ID and timestamp
     const messageId = `msg-${crypto.randomUUID()}`;
@@ -98,7 +98,7 @@ export async function busSendExecute(
 
     // --- Phase 1: Durable write to SQLite (BEFORE Redis check per RFC degradation table) ---
     let sqliteWriteSucceeded = false;
-    const sqlite = getSqliteClient(context.directory, projectHash);
+    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
     if (sqlite) {
       try {
         sqlite.insertMessage(messageObj);

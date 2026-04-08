@@ -241,6 +241,17 @@ export interface SearchResponseData {
 }
 
 /**
+ * Response data for bus_info tool
+ */
+export interface BusInfoResponseData {
+  projectHash: string;
+  bus_dir: string;
+  db_dir: string;
+  source: 'env' | 'config' | 'default';
+  configPath: string | null;
+}
+
+/**
  * Rate limiter bucket structure
  */
 export interface RateLimiterBucket {

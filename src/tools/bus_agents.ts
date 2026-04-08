@@ -7,7 +7,7 @@
  */
 
 import { getRedisClient } from '../redis';
-import { hashProjectPath } from '../namespace';
+import { resolveProjectHash } from '../config';
 import type {
   AgentStatus,
   ToolContext,
@@ -45,7 +45,7 @@ export async function busAgentsExecute(
 
   try {
     // Get project hash
-    const projectHash = hashProjectPath(context.directory);
+    const projectHash = resolveProjectHash(context.directory);
     const agentPattern = `opencode:${projectHash}:agent:*`;
     const client = redis.getClient();
 
