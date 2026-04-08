@@ -464,8 +464,6 @@ export function initializeTestSqliteSchema(db: Database): void {
 // Config test helpers
 // ============================================================================
 
-import { resetBusConfig } from '../src/config';
-
 /**
  * Create a temporary directory with optional .agentbus.json config.
  *
