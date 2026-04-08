@@ -198,19 +198,24 @@ function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
   // Walk up until we hit filesystem root or .git/ directory
   while (dir !== path.dirname(dir)) {
     const configPath = path.join(dir, '.agentbus.json');
+    const gitPath = path.join(dir, '.git');
 
-    if (fs.existsSync(configPath)) {
-      try {
-        return parseConfig(configPath, dir);
-      } catch (error) {
-        console.warn('[AgentBus] Failed to parse config file:', configPath, error instanceof Error ? error.message : String(error));
-        // Fall through to default
-      }
+    // Try to read config file first (most common case first)
+    try {
+      const content = fs.readFileSync(configPath, 'utf-8');
+      const raw = JSON.parse(content) as AgentBusConfigFile;
+      // Config file is valid, parse it
+      return parseConfig(configPath, dir);
+    } catch {
+      // Config file doesn't exist or is invalid - continue walking
     }
 
-    // Check if we've hit a git root
-    if (fs.existsSync(path.join(dir, '.git'))) {
+    // Check if we've hit a git root (only after confirming no config)
+    try {
+      fs.statSync(gitPath);
       break;
+    } catch {
+      // Not at git root, continue walking
     }
 
     dir = path.dirname(dir);
