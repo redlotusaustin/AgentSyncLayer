@@ -53,7 +53,7 @@ export async function busStatusExecute(
 
   try {
     // Validate task (max 256 chars as per contract)
-    const task = args.task.trim();
+    const task = args.task?.trim() ?? "";
     if (task.length === 0) {
       return {
         ok: false,
