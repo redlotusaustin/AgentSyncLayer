@@ -98,7 +98,6 @@ export async function busListenExecute(
     // Polling loop
     while (Date.now() < endTime) {
       const newMessages: Message[] = [];
-      let latestTimestamp = 0;
 
       // Check each channel for new messages
       for (const channel of channels) {
@@ -123,9 +122,6 @@ export async function busListenExecute(
               const msgTimestamp = new Date(msg.timestamp).getTime();
               if (msgTimestamp > (timestampMap.get(channel) ?? 0)) {
                 timestampMap.set(channel, msgTimestamp);
-              }
-              if (msgTimestamp > latestTimestamp) {
-                latestTimestamp = msgTimestamp;
               }
               newMessages.push(msg);
             }

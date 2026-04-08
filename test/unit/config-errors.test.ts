@@ -54,27 +54,14 @@ describe('config-errors (T5)', () => {
     }
   });
 
-  test('T5.4: .agentbus.json that is a directory → source: default', () => {
+  test('T5.4: bus pointing to a regular file → source: default', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
-      // Create a directory where the config file should be
-      const configDir = path.join(root, 'config-dir');
-      fs.mkdirSync(configDir, { recursive: true });
-
-      // Try to write .agentbus.json as a directory (this should fail)
-      // We can't actually create a dir with the same name as an existing file,
-      // so instead we'll test with a file that's a regular file
-      fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
-        JSON.stringify({ bus: root }) // This is valid, but...
-      );
-
-      // Now create a directory where bus points to a file path that's not a directory
-      // Actually the real test case is when the bus path itself is a file, not a directory
-      // Let's create a file and point bus to it
+      // Create a regular file where a directory is expected
       const fakeBusDir = path.join(root, 'not-a-directory.txt');
       fs.writeFileSync(fakeBusDir, 'not a directory');
 
+      // Create .agentbus.json pointing to that file
       fs.writeFileSync(
         path.join(root, '.agentbus.json'),
         JSON.stringify({ bus: './not-a-directory.txt' })

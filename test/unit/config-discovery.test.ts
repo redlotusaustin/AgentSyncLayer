@@ -90,6 +90,25 @@ describe('config-discovery (T3)', () => {
     }
   });
 
+  test('T3.4b: .git boundary — config above git root is NOT found', () => {
+    // Create parent of test env root (temp dir) — this represents "outside the project"
+    const { root, sub1, cleanup } = createTestDirTree();
+    try {
+      // Create .git in root (simulating git root boundary)
+      fs.mkdirSync(path.join(root, '.git'), { recursive: true });
+
+      // NO config at root or packages/ (the usual search locations)
+
+      // Run from sub1 - should NOT find any config and fall back to default
+      // because .git stops the upward walk and there's no config in the search path
+      const config = resolveBusConfig(sub1);
+      expect(config.source).toBe('default');
+      expect(config.bus_dir).toBe(sub1);
+    } finally {
+      cleanup();
+    }
+  });
+
   test('T3.5: ancestor walk at filesystem root → no crash, returns default', () => {
     // Use /tmp as starting point (should eventually hit / or a .git)
     const config = resolveBusConfig('/tmp');

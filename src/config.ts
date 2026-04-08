@@ -117,10 +117,10 @@ export function resolveBusConfig(cwd: string): BusConfig {
     return cached;
   }
 
-  let config: BusConfig;
+  let config: BusConfig | null;
 
   // Phase 1: Check environment variable
-  config = resolveFromEnv(canonicalCwd);
+  config = resolveFromEnv();
   if (config) {
     configCache.set(canonicalCwd, config);
     return config;
@@ -142,10 +142,9 @@ export function resolveBusConfig(cwd: string): BusConfig {
 /**
  * Attempt to resolve config from AGENTBUS_BUS_ID environment variable.
  *
- * @param canonicalCwd - Canonical current working directory
  * @returns BusConfig if env var is set and valid, null otherwise
  */
-function resolveFromEnv(canonicalCwd: string): BusConfig | null {
+function resolveFromEnv(): BusConfig | null {
   const envValue = process.env.AGENTBUS_BUS_ID;
   if (!envValue) {
     return null;
@@ -200,11 +199,9 @@ function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
     const configPath = path.join(dir, '.agentbus.json');
     const gitPath = path.join(dir, '.git');
 
-    // Try to read config file first (most common case first)
+    // Check config first — config at git root should be used.
+    // .git only stops upward walk when no config at this level.
     try {
-      const content = fs.readFileSync(configPath, 'utf-8');
-      const raw = JSON.parse(content) as AgentBusConfigFile;
-      // Config file is valid, parse it
       return parseConfig(configPath, dir);
     } catch {
       // Config file doesn't exist or is invalid - continue walking
@@ -283,6 +280,11 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
   } catch {
     console.warn('[AgentBus] Config db directory could not be resolved:', dbRelative);
     throw new Error('Invalid db directory');
+  }
+
+  // Warn if db_dir is outside the project tree (trust model)
+  if (!dbDir.startsWith(configDir) && !busDir.startsWith(configDir)) {
+    console.warn('[AgentBus] db_dir and bus_dir are both outside the project tree. This may indicate a misconfiguration or intentional cross-project shared bus.');
   }
 
   // Ensure db_dir is creatable
