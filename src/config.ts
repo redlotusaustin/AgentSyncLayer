@@ -244,8 +244,12 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
     const content = fs.readFileSync(configPath, 'utf-8');
     raw = JSON.parse(content);
   } catch (error) {
-    console.warn('[AgentBus] Failed to read/parse config file:', configPath, error instanceof Error ? error.message : String(error));
-    throw new Error('Failed to parse config');
+    const message = error instanceof Error ? error.message : String(error);
+    const isFileNotFound = message.includes("ENOENT") || message.includes("no such file");
+    if (!isFileNotFound) {
+      console.warn("[AgentBus] Failed to read/parse config file:", configPath, message);
+    }
+    throw new Error("Failed to parse config");
   }
 
   // Resolve bus_dir (default: configDir)
