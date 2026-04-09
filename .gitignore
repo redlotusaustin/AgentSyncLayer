@@ -28,3 +28,4 @@ dist/
 # Megamemory / scanner caches
 .megamemory/
 .yafcscanner/
+.cgcignore
