@@ -287,7 +287,9 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
   const dbDir = busConfig.db_dir;
   const agentId = getSessionAgentId(); // Same ID as tools use!
 
-  console.log(`[AgentBus] Bus: ${projectHash} (source: ${busConfig.source}, bus_dir: ${busConfig.bus_dir}, db_dir: ${busConfig.db_dir})`);
+  if (busConfig.source !== "default") {
+    console.log(`[AgentBus] Bus: ${projectHash} (source: ${busConfig.source}, bus_dir: ${busConfig.bus_dir}, db_dir: ${busConfig.db_dir})`);
+  }
 
   // Wait for Redis connection (max 5 seconds)
   try {
