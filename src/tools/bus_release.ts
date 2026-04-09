@@ -108,43 +108,22 @@ export async function busReleaseExecute(
 
     switch (result) {
       case 1:
-      case 2:
-        // 1 = released successfully, 2 = malformed claim deleted safely
-        // Only publish event for legitimate releases (case 1)
-        if (result === 1) {
-          await publishClaimEvent(client, projectHash, agentId, filePath, 'release');
-        }
+        // Released successfully - publish event
+        await publishClaimEvent(client, projectHash, agentId, filePath, 'release');
+        return { ok: true, data: { path: filePath, released: true } };
 
-        return {
-          ok: true,
-          data: {
-            path: filePath,
-            released: true,
-          },
-        };
+      case 2:
+        // Malformed claim deleted safely
+        return { ok: true, data: { path: filePath, released: true } };
 
       case -2:
-        // Key doesn't exist (not claimed)
-        return {
-          ok: false,
-          error: `File '${filePath}' is not claimed`,
-          code: 'CLAIM_NOT_FOUND',
-        };
+        return { ok: false, error: `File '${filePath}' is not claimed`, code: 'CLAIM_NOT_FOUND' };
 
       case -1:
-        // Ownership check failed (claimed by another agent)
-        return {
-          ok: false,
-          error: `File '${filePath}' is not claimed by this agent`,
-          code: 'CLAIM_NOT_OWNER',
-        };
+        return { ok: false, error: `File '${filePath}' is not claimed by this agent`, code: 'CLAIM_NOT_OWNER' };
 
       default:
-        return {
-          ok: false,
-          error: `Internal error: unexpected release result ${result}`,
-          code: 'INTERNAL_ERROR',
-        };
+        return { ok: false, error: `Internal error: unexpected release result ${result}`, code: 'INTERNAL_ERROR' };
     }
   } catch (error) {
     if (error instanceof ValidationException) {

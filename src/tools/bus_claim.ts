@@ -52,27 +52,26 @@ function buildClaimConflictResponse(
   conflictClaim: Claim | null,
   isRetry: boolean
 ): { ok: false; error: string; code: 'CLAIM_CONFLICT'; data: ClaimConflictData } {
-  const conflictData: ClaimConflictData = conflictClaim
-    ? {
+  if (conflictClaim) {
+    const extra = isRetry ? '' : ` (claimed at ${conflictClaim.claimedAt}, expires at ${conflictClaim.expiresAt})`;
+    return {
+      ok: false,
+      error: `File '${filePath}' is already claimed by agent ${conflictClaim.agentId}${extra}`,
+      code: 'CLAIM_CONFLICT',
+      data: {
         path: filePath,
         heldBy: conflictClaim.agentId,
         claimedAt: conflictClaim.claimedAt,
         expiresAt: conflictClaim.expiresAt,
-      }
-    : {
-        path: filePath,
-        heldBy: 'unknown',
-        claimedAt: 'unknown',
-        expiresAt: 'unknown',
-      };
+      },
+    };
+  }
 
   return {
     ok: false,
-    error: conflictClaim
-      ? `File '${filePath}' is already claimed by agent ${conflictClaim.agentId}${isRetry ? '' : ` (claimed at ${conflictClaim.claimedAt}, expires at ${conflictClaim.expiresAt})`}`
-      : `Failed to claim file '${filePath}': concurrent access detected`,
+    error: `Failed to claim file '${filePath}': concurrent access detected`,
     code: 'CLAIM_CONFLICT',
-    data: conflictData,
+    data: { path: filePath, heldBy: 'unknown', claimedAt: 'unknown', expiresAt: 'unknown' },
   };
 }
 

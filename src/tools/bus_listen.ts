@@ -143,14 +143,7 @@ export async function busListenExecute(
         // BRPOP timeout or no new messages - check deadline and loop
       }
 
-      // Sort by timestamp (newest first)
-      if (accumulatedMessages.length > 0) {
-        accumulatedMessages.sort((a, b) => {
-          const aTime = new Date(a.timestamp).getTime();
-          const bTime = new Date(b.timestamp).getTime();
-          return bTime - aTime;
-        });
-      }
+      accumulatedMessages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       // Return messages or timeout
       if (accumulatedMessages.length > 0) {
@@ -204,13 +197,6 @@ let busListenLastCheckTime = 0;
 
 /**
  * Fetch messages from sorted set history since a given timestamp
- *
- * @param redis - Redis client
- * @param historyKeys - Array of sorted set keys to query
- * @param sinceTimestamp - Fetch messages after this timestamp (ms)
- * @param agentId - Current agent ID for self-filtering
- * @param channels - Channels to include (for logging/debugging)
- * @returns Array of messages since timestamp
  */
 async function fetchMessagesSinceTimestamp(
   redis: ReturnType<typeof getRedisClient>,
@@ -220,45 +206,28 @@ async function fetchMessagesSinceTimestamp(
 ): Promise<Message[]> {
   const messages: Message[] = [];
   const client = redis.getClient();
-
-  // Use MULTI to fetch from all history keys atomically
   const multi = client.multi();
 
   for (const key of historyKeys) {
-    // ZREVRANGEBYSCORE returns messages with score > sinceTimestamp
-    // Using +inf as max to get all messages since the timestamp
     multi.zrevrangebyscore(key, '+inf', `(${sinceTimestamp}`, 'WITHSCORES');
   }
 
   const results = await multi.exec();
+  if (!results) return messages;
 
-  if (!results) {
-    return messages;
-  }
-
-  // Process results from all channels
   for (const [err, result] of results) {
     if (err) {
       console.warn('[bus_listen] Error fetching from history:', err);
       continue;
     }
 
-    // Results come as alternating value/score pairs: [msg1, score1, msg2, score2, ...]
     const items = result as string[];
     for (let i = 0; i < items.length; i += 2) {
-      const msgJson = items[i];
       try {
-        const msg = JSON.parse(msgJson) as Message;
-
-        // Self-filter: exclude messages from this agent
-        if (msg.from === agentId) {
-          continue;
-        }
-
-        messages.push(msg);
+        const msg = JSON.parse(items[i]) as Message;
+        if (msg.from !== agentId) messages.push(msg);
       } catch {
-        // Skip malformed messages
-        console.warn('[bus_listen] Malformed message in history:', msgJson.substring(0, 100));
+        console.warn('[bus_listen] Malformed message in history:', items[i].substring(0, 100));
       }
     }
   }

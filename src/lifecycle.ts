@@ -40,7 +40,6 @@ export async function publishClaimEvent(
   filePath: string,
   eventType: 'claim' | 'release'
 ): Promise<void> {
-  const now = new Date().toISOString();
   const messageObj = {
     id: `evt-${crypto.randomUUID()}`,
     from: agentId,
@@ -51,21 +50,16 @@ export async function publishClaimEvent(
       path: filePath,
       agentId,
     },
-    timestamp: now,
+    timestamp: new Date().toISOString(),
     project: projectHash,
   };
 
   const messageJson = JSON.stringify(messageObj);
-  const pubSubChannel = `opencode:${projectHash}:ch:${CLAIMS_CHANNEL}`;
-  const historyKey = `opencode:${projectHash}:history:${CLAIMS_CHANNEL}`;
-  const channelsKey = `opencode:${projectHash}:channels`;
-  const timestampMs = Date.now();
-
   const pipeline = client.pipeline();
-  pipeline.publish(pubSubChannel, messageJson);
-  pipeline.zadd(historyKey, timestampMs, messageJson);
-  pipeline.zremrangebyrank(historyKey, 0, -(HISTORY_CAP + 1)); // Keep only HISTORY_CAP messages
-  pipeline.sadd(channelsKey, CLAIMS_CHANNEL);
+  pipeline.publish(`opencode:${projectHash}:ch:${CLAIMS_CHANNEL}`, messageJson);
+  pipeline.zadd(`opencode:${projectHash}:history:${CLAIMS_CHANNEL}`, Date.now(), messageJson);
+  pipeline.zremrangebyrank(`opencode:${projectHash}:history:${CLAIMS_CHANNEL}`, 0, -(HISTORY_CAP + 1));
+  pipeline.sadd(`opencode:${projectHash}:channels`, CLAIMS_CHANNEL);
   await pipeline.exec();
 }
 

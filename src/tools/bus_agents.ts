@@ -15,42 +15,25 @@ import type {
   AgentsResponseData,
 } from '../types';
 
-/**
- * Execute bus_agents: list active agents with their status
- *
- * @param _args - Tool arguments (none)
- * @param context - Tool context (directory)
- * @returns Response with agent list
- */
+function unavailableResponse(): ToolResponse<AgentsResponseData> {
+  return {
+    ok: false,
+    error: 'Bus unavailable: Redis connection not established',
+    code: 'BUS_UNAVAILABLE',
+  };
+}
+
 export async function busAgentsExecute(
   _args: Record<string, never>,
   context: ToolContext
 ): Promise<ToolResponse<AgentsResponseData>> {
-  const redis = getRedisClient();
-
-  // Check Redis connection
-  if (!redis.checkConnection()) {
-    return {
-      ok: false,
-      error: 'Bus unavailable: Redis connection not established',
-      code: 'BUS_UNAVAILABLE',
-    };
+  if (!getRedisClient().checkConnection()) {
+    return unavailableResponse();
   }
 
   try {
-    // Get project hash
-    const projectHash = resolveProjectHash(context.directory);
-
-    // Get active agents from lifecycle helper
-    const agents = await getActiveAgents(projectHash);
-
-    return {
-      ok: true,
-      data: {
-        agents,
-        count: agents.length,
-      },
-    };
+    const agents = await getActiveAgents(resolveProjectHash(context.directory));
+    return { ok: true, data: { agents, count: agents.length } };
   } catch (error) {
     console.error('[bus_agents] Error:', error);
     return {

@@ -69,7 +69,6 @@ export async function busChannelsExecute(
       messages: Number(pipelineResults?.[index]?.[1] ?? 0),
     }));
 
-    // Sort by name for consistent output
     channelInfos.sort((a, b) => a.name.localeCompare(b.name));
 
     return {

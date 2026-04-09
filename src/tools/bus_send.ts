@@ -167,9 +167,8 @@ export async function busSendExecute(
 
     // Execute pipeline
     const results = await pipeline.exec();
-    const pipelineErrors = results?.filter(([err]) => err !== null);
-    if (pipelineErrors && pipelineErrors.length > 0) {
-      console.warn('[bus_send] Redis pipeline had errors:', pipelineErrors);
+    if (results?.some(([err]) => err)) {
+      console.warn('[bus_send] Redis pipeline had errors:', results.filter(([err]) => err));
     }
 
     // Also update last-seen timestamp for the sending agent
