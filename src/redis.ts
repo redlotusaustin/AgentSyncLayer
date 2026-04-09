@@ -72,6 +72,9 @@ export class RedisClient {
   private retryCount = 0;
   private connectionPromise: Promise<void> | null = null;
 
+  /** Map of channel -> Set of callbacks (deduplicates handlers) */
+  private readonly channelCallbacks = new Map<string, Set<(message: string) => void>>();
+
   /**
    * Create a new Redis client wrapper
    *
@@ -261,6 +264,10 @@ export class RedisClient {
   /**
    * Subscribe to a Redis pub/sub channel
    *
+   * Registers the callback for the channel. Subsequent calls with the same
+   * channel will add additional callbacks (deduplication is per-callback).
+   * The underlying Redis subscription is only called once per channel.
+   *
    * @param channel - The channel name to subscribe to
    * @param callback - Function called when message is received
    */
@@ -268,12 +275,48 @@ export class RedisClient {
     if (!this.checkConnection()) {
       throw new RedisConnectionError('Cannot subscribe: Redis is not connected');
     }
-    this.client.subscribe(channel);
-    this.client.on('message', (ch: string, msg: string) => {
-      if (ch === channel) {
-        callback(msg);
-      }
-    });
+
+    // Track callback for this channel
+    if (!this.channelCallbacks.has(channel)) {
+      this.channelCallbacks.set(channel, new Set());
+
+      // First callback for this channel - subscribe to Redis
+      await this.client.subscribe(channel);
+
+      // Set up the message handler (only once per channel)
+      this.client.on('message', (ch: string, msg: string) => {
+        if (ch === channel) {
+          const callbacks = this.channelCallbacks.get(ch);
+          if (callbacks) {
+            for (const cb of callbacks) {
+              cb(msg);
+            }
+          }
+        }
+      });
+    }
+
+    // Add callback to the set (deduplicated)
+    this.channelCallbacks.get(channel)!.add(callback);
+  }
+
+  /**
+   * Unsubscribe from a Redis pub/sub channel
+   *
+   * Removes all callbacks for the channel and unsubscribes from Redis.
+   *
+   * @param channel - The channel name to unsubscribe from
+   */
+  async unsubscribe(channel: string): Promise<void> {
+    if (!this.checkConnection()) {
+      throw new RedisConnectionError('Cannot unsubscribe: Redis is not connected');
+    }
+
+    // Remove all callbacks for this channel
+    this.channelCallbacks.delete(channel);
+
+    // Unsubscribe from Redis (only if no callbacks remain)
+    await this.client.unsubscribe(channel);
   }
 
   /**

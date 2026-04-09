@@ -6,6 +6,7 @@
  * rather than reading from global state, making them reusable and testable.
  */
 
+import * as crypto from 'crypto';
 import { getRedisClient } from './redis';
 import type { AgentStatus, Claim, Message } from './types';
 
@@ -14,6 +15,59 @@ const SCAN_BATCH_SIZE = 100;
 
 /** Maximum total keys to scan (safety limit to prevent runaway scans) */
 const SCAN_MAX_KEYS = 10000;
+
+/** Maximum number of messages to keep in channel history */
+const HISTORY_CAP = 100;
+
+/** Claim event channel name for coordination events */
+const CLAIMS_CHANNEL = 'claims';
+
+/**
+ * Publish a claim/release event message to the claims channel.
+ *
+ * Used by bus_claim and bus_release to notify other agents about claim changes.
+ *
+ * @param client - The raw ioredis client
+ * @param projectHash - The 12-character project hash
+ * @param agentId - The agent ID performing the action
+ * @param filePath - The file path being claimed/released
+ * @param eventType - Either 'claim' or 'release'
+ */
+export async function publishClaimEvent(
+  client: import('ioredis').Redis,
+  projectHash: string,
+  agentId: string,
+  filePath: string,
+  eventType: 'claim' | 'release'
+): Promise<void> {
+  const now = new Date().toISOString();
+  const messageObj = {
+    id: `evt-${crypto.randomUUID()}`,
+    from: agentId,
+    channel: CLAIMS_CHANNEL,
+    type: eventType,
+    payload: {
+      text: `${eventType === 'claim' ? 'Claimed' : 'Released'}: ${filePath}`,
+      path: filePath,
+      agentId,
+    },
+    timestamp: now,
+    project: projectHash,
+  };
+
+  const messageJson = JSON.stringify(messageObj);
+  const pubSubChannel = `opencode:${projectHash}:ch:${CLAIMS_CHANNEL}`;
+  const historyKey = `opencode:${projectHash}:history:${CLAIMS_CHANNEL}`;
+  const channelsKey = `opencode:${projectHash}:channels`;
+  const timestampMs = Date.now();
+
+  const pipeline = client.pipeline();
+  pipeline.publish(pubSubChannel, messageJson);
+  pipeline.zadd(historyKey, timestampMs, messageJson);
+  pipeline.zremrangebyrank(historyKey, 0, -(HISTORY_CAP + 1)); // Keep only HISTORY_CAP messages
+  pipeline.sadd(channelsKey, CLAIMS_CHANNEL);
+  await pipeline.exec();
+}
 
 /**
  * Get all active agents from Redis for a project

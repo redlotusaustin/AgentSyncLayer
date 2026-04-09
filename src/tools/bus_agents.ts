@@ -2,24 +2,18 @@
  * bus_agents tool - List active agents with their status
  *
  * Operations:
- * 1. SCAN for all agent keys
- * 2. GET each agent's status
+ * 1. Get active agents via lifecycle helper
+ * 2. Return agent list
  */
 
 import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
+import { getActiveAgents } from '../lifecycle';
 import type {
-  AgentStatus,
   ToolContext,
   ToolResponse,
   AgentsResponseData,
 } from '../types';
-
-/** Maximum number of keys to scan per iteration */
-const SCAN_BATCH_SIZE = 100;
-
-/** Maximum total keys to scan (safety limit) */
-const SCAN_MAX_KEYS = 10000;
 
 /**
  * Execute bus_agents: list active agents with their status
@@ -46,51 +40,9 @@ export async function busAgentsExecute(
   try {
     // Get project hash
     const projectHash = resolveProjectHash(context.directory);
-    const agentPattern = `opencode:${projectHash}:agent:*`;
-    const client = redis.getClient();
 
-    // SCAN for agent keys
-    const agentKeys: string[] = [];
-    let cursor = '0';
-
-    do {
-      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', agentPattern, 'COUNT', SCAN_BATCH_SIZE);
-      cursor = nextCursor;
-      agentKeys.push(...keys);
-    } while (cursor !== '0' && agentKeys.length < SCAN_MAX_KEYS); // Safety limit
-
-    if (agentKeys.length === 0) {
-      return {
-        ok: true,
-        data: {
-          agents: [],
-          count: 0,
-        },
-      };
-    }
-
-    // GET all agent statuses in parallel
-    const statuses = await Promise.all(
-      agentKeys.map(async (key) => {
-        const data = await client.get(key);
-        if (!data) return null;
-        try {
-          return JSON.parse(data) as AgentStatus;
-        } catch {
-          return null;
-        }
-      })
-    );
-
-    // Filter out nulls and stale entries (TTL auto-deletes, but double-check)
-    const agents: AgentStatus[] = statuses
-      .filter((status): status is AgentStatus => {
-        if (!status) return false;
-        // Check if heartbeat is recent (within 90s)
-        const heartbeatAge = Date.now() - new Date(status.lastHeartbeat).getTime();
-        return heartbeatAge < 90000; // 90 seconds
-      })
-      .sort((a, b) => a.id.localeCompare(b.id));
+    // Get active agents from lifecycle helper
+    const agents = await getActiveAgents(projectHash);
 
     return {
       ok: true,
