@@ -99,7 +99,10 @@ export function validateMessage(text: string): string {
  * @returns The normalized file path
  * @throws ValidationException if path is invalid
  */
-export function validateFilePath(path: string): string {
+export function validateFilePath(path: unknown): string {
+  if (typeof path !== 'string') {
+    return '';
+  }
   // Normalize backslashes to forward slashes
   const normalized = path.trim().replace(/\\/g, '/');
 

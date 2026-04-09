@@ -73,6 +73,13 @@ const BUS_INSTRUCTIONS: string[] = [
 // ============================================================================
 
 function toAgentBusContext(context: ToolContext): AgentBusToolContext {
+  // Guard against missing or malformed context
+  if (!context || typeof context.directory !== 'string' || !context.directory) {
+    return {
+      directory: process.cwd() || '.',
+      worktree: undefined,
+    };
+  }
   return {
     directory: context.directory,
     worktree: context.worktree,
