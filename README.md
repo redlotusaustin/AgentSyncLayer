@@ -821,7 +821,6 @@ agentbus/
 │       ├── bus_search.ts  # Full-text search (FTS5)
 │       └── notifications.ts # Last-seen timestamp tracking
 ├── bus-monitor.ts         # CLI for inspecting and tailing bus state
-├── smoke-test.ts          # Basic smoke tests for tool execution
 └── test/
     ├── helpers.ts
     ├── fixtures.ts

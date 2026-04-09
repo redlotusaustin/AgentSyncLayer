@@ -156,7 +156,12 @@ export async function busSendExecute(
     const queueKey = `opencode:${projectHash}:queue`;
     pipeline.lpush(queueKey, messageJson);
 
-    // 5. SADD channel to active channels set
+    // 5. ZREMRANGEBYRANK to cap queue at 1000 items (keep newest 1000)
+    // Prevents unbounded queue growth from stale BRPOP items
+    const QUEUE_CAP = 1000;
+    pipeline.ltrim(queueKey, 0, QUEUE_CAP - 1);
+
+    // 6. SADD channel to active channels set
     const channelsKey = `opencode:${projectHash}:channels`;
     pipeline.sadd(channelsKey, channel);
 
