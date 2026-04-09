@@ -1,5 +1,5 @@
 /**
- * AgentBus Plugin Entry Point
+ * AgentSyncLayer Plugin Entry Point
  * 
  * Re-exports the adapter as the main entry point.
  * OpenCode loads plugins via the Plugin type from @opencode-ai/plugin.
@@ -8,8 +8,8 @@
  * The canonical plugin file is ./adapter.ts.
  */
 
-export { AgentBusPlugin as default } from './adapter';
-export { AgentBusPlugin } from './adapter';
+export { AgentSyncLayerPlugin as default } from './adapter';
+export { AgentSyncLayerPlugin } from './adapter';
 
 // Re-export tool implementations for external use
 export {

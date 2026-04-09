@@ -1,5 +1,5 @@
 /**
- * Project namespace management for AgentBus
+ * Project namespace management for AgentSyncLayer
  *
  * Handles project path hashing and Redis key construction
  * according to the contract.md specifications.

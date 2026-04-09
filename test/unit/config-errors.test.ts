@@ -13,7 +13,7 @@ describe('config-errors (T5)', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         '{ invalid json }'
       );
 
@@ -28,7 +28,7 @@ describe('config-errors (T5)', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: 123 })
       );
 
@@ -43,7 +43,7 @@ describe('config-errors (T5)', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: '/non/existent/path' })
       );
 
@@ -61,9 +61,9 @@ describe('config-errors (T5)', () => {
       const fakeBusDir = path.join(root, 'not-a-directory.txt');
       fs.writeFileSync(fakeBusDir, 'not a directory');
 
-      // Create .agentbus.json pointing to that file
+      // Create .agentsynclayer.json pointing to that file
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: './not-a-directory.txt' })
       );
 
@@ -78,7 +78,7 @@ describe('config-errors (T5)', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({
           bus: '.',
           db: '.',

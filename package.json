@@ -1,5 +1,5 @@
 {
-  "name": "agentbus",
+  "name": "agentsynclayer",
   "version": "0.5.0",
   "description": "Redis-backed pub/sub messaging for coordinating multiple AI agent sessions",
   "type": "module",

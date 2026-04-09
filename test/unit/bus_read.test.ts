@@ -33,7 +33,7 @@ import { cleanupRateLimiter } from '../../src/tools/bus_send';
 import type { Message, ToolContext } from '../../src/types';
 
 // Test configuration
-const TEST_REDIS_URL = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
+const TEST_REDIS_URL = process.env.AGENTSYNCLAYER_REDIS_URL ?? 'redis://localhost:6379';
 const TEST_DB = 15;
 
 function buildTestRedisUrl(): string {
@@ -43,8 +43,8 @@ function buildTestRedisUrl(): string {
 }
 
 function createTestDirectory(): { dir: string; cleanup: () => void } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-bus-read-test-'));
-  fs.mkdirSync(path.join(dir, '.agentbus'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-bus-read-test-'));
+  fs.mkdirSync(path.join(dir, '.agentsynclayer'));
   return {
     dir,
     cleanup: () => {

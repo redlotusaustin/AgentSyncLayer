@@ -82,7 +82,7 @@ export async function busReadExecute(
     // newer ones, bus_read may return stale data. Per RFC, bus_read falls back to
     // SQLite when Redis is "empty" (0 messages), not "stale". This is an acceptable
     // trade-off given Redis serves as the fast cache and SQLite provides durability.
-    const sqlite = getSqliteClient(resolveDbDir(context.directory));
+    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
     if (messages.length === 0 && sqlite) {
       const result = sqlite.getMessages({
         projectHash,

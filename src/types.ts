@@ -1,5 +1,5 @@
 /**
- * TypeScript type definitions for AgentBus
+ * TypeScript type definitions for AgentSyncLayer
  *
  * Defines interfaces for messages, agent status, claims, and tool responses
  * following the contract.md specifications.
@@ -9,7 +9,7 @@
 export type MessageType = 'info' | 'status' | 'error' | 'coordination' | 'claim' | 'release';
 
 /**
- * AgentBus message structure - all messages flowing through the bus
+ * AgentSyncLayer message structure - all messages flowing through the bus
  * conform to this JSON schema.
  */
 export interface Message {

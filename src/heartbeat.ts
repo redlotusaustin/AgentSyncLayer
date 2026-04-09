@@ -1,5 +1,5 @@
 /**
- * Heartbeat timer management for AgentBus
+ * Heartbeat timer management for AgentSyncLayer
  *
  * Manages automatic status refresh to keep agent status alive in Redis.
  * Uses 30-second intervals with 90-second TTL to ensure agents are considered

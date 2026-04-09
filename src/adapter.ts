@@ -279,7 +279,7 @@ const state: PluginState = {
 // Plugin Factory
 // ============================================================================
 
-export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
+export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
   const { directory } = input;
   const redis = getRedisClient();
   const busConfig = resolveBusConfig(directory);
@@ -320,7 +320,7 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
   state.directory = directory;
 
   // Initialize SQLite client (optional, graceful degradation)
-  const sqlite = getSqliteClient(dbDir);
+  const sqlite = getSqliteClient(dbDir, projectHash);
   if (!sqlite) {
     console.warn("[AgentBus] SQLite not available, running in Redis-only mode");
   }
@@ -370,7 +370,7 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
       }
 
       const agentId = getSessionAgentId();
-      const sqlite = getSqliteClient(state.dbDir);
+      const sqlite = getSqliteClient(state.dbDir, state.projectHash);
       if (!sqlite) {
         return;
       }
@@ -431,4 +431,4 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
 };
 
 // Export as default for convenience
-export default AgentBusPlugin;
+export default AgentSyncLayerPlugin;

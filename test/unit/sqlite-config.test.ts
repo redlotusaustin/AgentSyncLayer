@@ -19,10 +19,10 @@ import {
 } from '../../src/sqlite';
 
 describe('T8: SQLite DB Placement', () => {
-  describe('T8.1: DB created at {dbDir}/.agentbus/history.db', () => {
-    test('creates .agentbus directory and history.db file', () => {
-      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-placement-'));
-      const expectedDbPath = path.join(tempDir, '.agentbus', 'history.db');
+  describe('T8.1: DB created at {dbDir}/.agentsynclayer/history.db', () => {
+    test('creates .agentsynclayer directory and history.db file', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-placement-'));
+      const expectedDbPath = path.join(tempDir, '.agentsynclayer', 'history.db');
 
       try {
         // Verify DB doesn't exist yet
@@ -33,8 +33,8 @@ describe('T8: SQLite DB Placement', () => {
         expect(client).not.toBeNull();
         expect(client).toBeInstanceOf(SqliteClient);
 
-        // Verify .agentbus directory was created
-        expect(fs.existsSync(path.join(tempDir, '.agentbus'))).toBe(true);
+        // Verify .agentsynclayer directory was created
+        expect(fs.existsSync(path.join(tempDir, '.agentsynclayer'))).toBe(true);
 
         // Verify history.db file was created
         expect(fs.existsSync(expectedDbPath)).toBe(true);
@@ -47,16 +47,16 @@ describe('T8: SQLite DB Placement', () => {
       }
     });
 
-    test('DB path is correct even when .agentbus exists', () => {
-      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-placement-'));
-      const agentbusDir = path.join(tempDir, '.agentbus');
-      fs.mkdirSync(agentbusDir, { recursive: true });
+    test('DB path is correct even when .agentsynclayer exists', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-placement-'));
+      const agentsynclayerDir = path.join(tempDir, '.agentsynclayer');
+      fs.mkdirSync(agentsynclayerDir, { recursive: true });
 
       try {
         const client = getSqliteClient(tempDir, 'a1b2c3d4e5f6');
         expect(client).not.toBeNull();
 
-        const expectedDbPath = path.join(agentbusDir, 'history.db');
+        const expectedDbPath = path.join(agentsynclayerDir, 'history.db');
         expect(client!.getDbPath()).toBe(expectedDbPath);
         expect(fs.existsSync(expectedDbPath)).toBe(true);
       } finally {
@@ -68,7 +68,7 @@ describe('T8: SQLite DB Placement', () => {
 
   describe('T8.2: Same db_dir returns same SqliteClient instance', () => {
     test('reference equality for same directory', () => {
-      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-singleton-'));
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-singleton-'));
 
       try {
         // Get client twice for same directory
@@ -90,7 +90,7 @@ describe('T8: SQLite DB Placement', () => {
     });
 
     test('client remains the same across multiple calls', () => {
-      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-singleton-'));
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-singleton-'));
 
       try {
         const clients: SqliteClient[] = [];
@@ -111,8 +111,8 @@ describe('T8: SQLite DB Placement', () => {
 
   describe('T8.3: Different db_dir returns different instances', () => {
     test('different directories get different clients', () => {
-      const tempDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-dir1-'));
-      const tempDir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-dir2-'));
+      const tempDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-dir1-'));
+      const tempDir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-dir2-'));
 
       try {
         const client1 = getSqliteClient(tempDir1, 'a1b2c3d4e5f6');
@@ -124,8 +124,8 @@ describe('T8: SQLite DB Placement', () => {
         expect(client2).not.toBeNull();
 
         // Each should have its own DB path
-        const dbPath1 = path.join(tempDir1, '.agentbus', 'history.db');
-        const dbPath2 = path.join(tempDir2, '.agentbus', 'history.db');
+        const dbPath1 = path.join(tempDir1, '.agentsynclayer', 'history.db');
+        const dbPath2 = path.join(tempDir2, '.agentsynclayer', 'history.db');
         expect(client1!.getDbPath()).toBe(dbPath1);
         expect(client2!.getDbPath()).toBe(dbPath2);
 
@@ -140,8 +140,8 @@ describe('T8: SQLite DB Placement', () => {
     });
 
     test('symlinked directories get different instances (singleton keyed by raw path)', () => {
-      const tempDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-orig-'));
-      const linkDir = path.join(os.tmpdir(), 'agentbus-link-' + Date.now());
+      const tempDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-orig-'));
+      const linkDir = path.join(os.tmpdir(), 'agentsynclayer-link-' + Date.now());
       fs.symlinkSync(tempDir1, linkDir);
 
       try {
@@ -153,8 +153,8 @@ describe('T8: SQLite DB Placement', () => {
         expect(client1).not.toBe(client2);
 
         // Each gets its own DB file in its respective directory
-        expect(client1!.getDbPath()).toBe(path.join(tempDir1, '.agentbus', 'history.db'));
-        expect(client2!.getDbPath()).toBe(path.join(linkDir, '.agentbus', 'history.db'));
+        expect(client1!.getDbPath()).toBe(path.join(tempDir1, '.agentsynclayer', 'history.db'));
+        expect(client2!.getDbPath()).toBe(path.join(linkDir, '.agentsynclayer', 'history.db'));
       } finally {
         closeSqliteClient(tempDir1);
         closeSqliteClient(linkDir);
@@ -166,7 +166,7 @@ describe('T8: SQLite DB Placement', () => {
 
   describe('T8.4: closeSqliteClient removes from map', () => {
     test('after close, next call creates new instance', () => {
-      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-close-'));
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-close-'));
 
       try {
         // First call
@@ -207,8 +207,8 @@ describe('T8: SQLite DB Placement', () => {
     });
 
     test('close only affects the specified directory', () => {
-      const tempDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-dir1-'));
-      const tempDir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-dir2-'));
+      const tempDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-dir1-'));
+      const tempDir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-dir2-'));
 
       try {
         // Get clients for both directories
@@ -236,7 +236,7 @@ describe('T8: SQLite DB Placement', () => {
     });
 
     test('calling close on non-existent client is safe', () => {
-      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-noexist-'));
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-noexist-'));
 
       try {
         // Should not throw

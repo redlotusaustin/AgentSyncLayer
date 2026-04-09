@@ -2,7 +2,7 @@
  * Multi-Instance Communication Tests
  *
  * Tests that two agents can exchange messages through Redis.
- * This verifies the core AgentBus functionality for inter-agent communication.
+ * This verifies the core AgentSyncLayer functionality for inter-agent communication.
  *
  * Tests:
  * - Agent A sends message, Agent B reads it

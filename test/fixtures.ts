@@ -1,5 +1,5 @@
 /**
- * Test fixtures for AgentBus tests
+ * Test fixtures for AgentSyncLayer tests
  *
  * Provides factory functions for creating test data with sensible defaults.
  * All test data uses realistic-looking IDs and timestamps.

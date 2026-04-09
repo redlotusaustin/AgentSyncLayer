@@ -1,5 +1,5 @@
 /**
- * Test helpers for AgentBus integration tests
+ * Test helpers for AgentSyncLayer integration tests
  *
  * Provides Redis setup/teardown utilities using DB 15 for isolation.
  * All integration tests should use these helpers to ensure clean state.
@@ -14,7 +14,7 @@ import type { RedisClient } from '../src/redis';
 import { resetBusConfig } from '../src/config';
 
 // Test Redis configuration - use DB 15 for isolation
-const TEST_REDIS_URL = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
+const TEST_REDIS_URL = process.env.AGENTSYNCLAYER_REDIS_URL ?? 'redis://localhost:6379';
 const TEST_DB = 15;
 
 /**
@@ -288,7 +288,7 @@ export class MockTime {
 /**
  * SQLite test database configuration
  */
-const TEST_DB_PATH = '.agentbus/history.db';
+const TEST_DB_PATH = '.agentsynclayer/history.db';
 
 /**
  * Create a test SQLite database in a temporary directory
@@ -306,8 +306,8 @@ export function createTestSqliteDb(): {
   dbPath: string;
   cleanup: () => void;
 } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-test-'));
-  const dbDir = path.join(dir, '.agentbus');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-test-'));
+  const dbDir = path.join(dir, '.agentsynclayer');
   fs.mkdirSync(dbDir, { recursive: true });
   const dbPath = path.join(dbDir, 'history.db');
   const db = new Database(dbPath);
@@ -358,7 +358,7 @@ export function createTestSqliteContext(): TestSqliteContext {
       if (!tempDir) {
         throw new Error('Test SQLite context not initialized. Call setup() first.');
       }
-      const dbPath = path.join(tempDir, '.agentbus', 'history.db');
+      const dbPath = path.join(tempDir, '.agentsynclayer', 'history.db');
       return new Database(dbPath);
     },
 
@@ -373,12 +373,12 @@ export function createTestSqliteContext(): TestSqliteContext {
       if (!tempDir) {
         throw new Error('Test SQLite context not initialized. Call setup() first.');
       }
-      return path.join(tempDir, '.agentbus', 'history.db');
+      return path.join(tempDir, '.agentsynclayer', 'history.db');
     },
 
     async setup(): Promise<void> {
-      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-test-'));
-      const dbDir = path.join(tempDir, '.agentbus');
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-test-'));
+      const dbDir = path.join(tempDir, '.agentsynclayer');
       fs.mkdirSync(dbDir, { recursive: true });
       const dbPath = path.join(dbDir, 'history.db');
       // Create and close to ensure schema is initialized
@@ -465,16 +465,16 @@ export function initializeTestSqliteSchema(db: Database): void {
 // ============================================================================
 
 /**
- * Create a temporary directory with optional .agentbus.json config.
+ * Create a temporary directory with optional .agentsynclayer.json config.
  *
  * Useful for testing config resolution from CWD or env vars.
  *
- * @param config - Optional .agentbus.json content
+ * @param config - Optional .agentsynclayer.json content
  * @returns Object with root path and cleanup function
  *
  * @example
  * const { root, cleanup } = createTestBusEnv({ bus: '.' });
- * // root/.agentbus.json will be created
+ * // root/.agentsynclayer.json will be created
  * cleanup();
  */
 export function createTestBusEnv(
@@ -483,9 +483,9 @@ export function createTestBusEnv(
   root: string;
   cleanup: () => void;
 } {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-config-test-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-config-test-'));
   if (config) {
-    fs.writeFileSync(path.join(root, '.agentbus.json'), JSON.stringify(config, null, 2));
+    fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify(config, null, 2));
   }
   return {
     root,
@@ -506,7 +506,7 @@ export function createTestBusEnv(
  * @example
  * const { root, sub1, sub2, cleanup } = createTestDirTree();
  * // Create config in root
- * fs.writeFileSync(path.join(root, '.agentbus.json'), '{}');
+ * fs.writeFileSync(path.join(root, '.agentsynclayer.json'), '{}');
  * // Test from sub1 - should find ancestor config
  * cleanup();
  */
@@ -516,7 +516,7 @@ export function createTestDirTree(): {
   sub2: string;
   cleanup: () => void;
 } {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-tree-test-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-tree-test-'));
   const sub1 = path.join(root, 'packages', 'api');
   const sub2 = path.join(root, 'packages', 'web');
   fs.mkdirSync(sub1, { recursive: true });

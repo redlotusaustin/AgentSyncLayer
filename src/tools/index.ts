@@ -1,5 +1,5 @@
 /**
- * AgentBus Tools - Export all tool implementations
+ * AgentSyncLayer Tools - Export all tool implementations
  *
  * This module exports all 11 bus tools for easy importing:
  * - bus_send: Publish a message to a channel

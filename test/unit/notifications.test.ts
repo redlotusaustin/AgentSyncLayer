@@ -141,7 +141,7 @@ describe('notifications', () => {
  */
 async function createTestRedisWrapper(): Promise<RedisClient> {
   const { RedisClient } = await import('../../src/redis');
-  const redisUrl = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
+  const redisUrl = process.env.AGENTSYNCLAYER_REDIS_URL ?? 'redis://localhost:6379';
   const url = new URL(redisUrl);
   url.searchParams.set('db', '15');
 

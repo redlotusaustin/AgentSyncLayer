@@ -28,11 +28,11 @@ describe('bus-info (T7)', () => {
     }
   });
 
-  test('T7.2: bus_info with .agentbus.json → source: config, configPath set', async () => {
+  test('T7.2: bus_info with .agentsynclayer.json → source: config, configPath set', async () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: '.' })
       );
 
@@ -42,7 +42,7 @@ describe('bus-info (T7)', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.source).toBe('config');
-        expect(result.data.configPath).toBe(path.join(root, '.agentbus.json'));
+        expect(result.data.configPath).toBe(path.join(root, '.agentsynclayer.json'));
       }
     } finally {
       cleanup();
@@ -50,13 +50,13 @@ describe('bus-info (T7)', () => {
   });
 
   test('T7.3: bus_info with env var → source: env, configPath: null', async () => {
-    const originalEnvBusId = process.env.AGENTBUS_BUS_ID;
+    const originalEnvBusId = process.env.AGENTSYNCLAYER_BUS_ID;
     try {
       const { root, cleanup } = createTestBusEnv();
       try {
         const dir = path.join(root, 'env-bus');
         fs.mkdirSync(dir, { recursive: true });
-        process.env.AGENTBUS_BUS_ID = dir;
+        process.env.AGENTSYNCLAYER_BUS_ID = dir;
 
         const context = createTestToolContext(root);
         const result = await busInfoExecute({}, context);
@@ -68,11 +68,11 @@ describe('bus-info (T7)', () => {
         }
       } finally {
         cleanup();
-        delete process.env.AGENTBUS_BUS_ID;
+        delete process.env.AGENTSYNCLAYER_BUS_ID;
       }
     } finally {
       if (originalEnvBusId !== undefined) {
-        process.env.AGENTBUS_BUS_ID = originalEnvBusId;
+        process.env.AGENTSYNCLAYER_BUS_ID = originalEnvBusId;
       }
     }
   });

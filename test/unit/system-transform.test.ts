@@ -47,7 +47,7 @@ describe('system-transform hook unit tests', () => {
       const lines = buildNotificationText(unreadMessages);
 
       expect(lines.length).toBeGreaterThan(0);
-      expect(lines[0]).toBe('[AgentBus] Unread messages:');
+      expect(lines[0]).toBe('[AgentSyncLayer] Unread messages:');
       expect(lines.join('\n')).toContain('general: 2 message(s) from agent-alice, agent-bob');
       expect(lines.join('\n')).toContain('Hello team');
       expect(lines.join('\n')).toContain('Use bus_read to view details.');
@@ -185,7 +185,7 @@ describe('system-transform hook unit tests', () => {
       existingSystem.push(...notificationLines);
 
       expect(existingSystem.length).toBeGreaterThan(2);
-      expect(existingSystem).toContain('[AgentBus] Unread messages:');
+      expect(existingSystem).toContain('[AgentSyncLayer] Unread messages:');
     });
   });
 
@@ -207,7 +207,7 @@ describe('system-transform hook unit tests', () => {
 
       // Should not crash and should show the notification
       expect(lines.length).toBeGreaterThan(0);
-      expect(lines[0]).toBe('[AgentBus] Unread messages:');
+      expect(lines[0]).toBe('[AgentSyncLayer] Unread messages:');
       expect(lines.join('\n')).toContain('general: 1 message(s) from agent-alice');
     });
 

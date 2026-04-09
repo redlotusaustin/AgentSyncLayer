@@ -16,7 +16,7 @@ describe('config-paths (T4)', () => {
       fs.mkdirSync(absPath, { recursive: true });
 
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: absPath })
       );
 
@@ -31,7 +31,7 @@ describe('config-paths (T4)', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: '.' })
       );
 
@@ -51,9 +51,9 @@ describe('config-paths (T4)', () => {
       const subDir = path.join(parentDir, 'test-subdir');
       fs.mkdirSync(subDir, { recursive: true });
 
-      // Create .agentbus.json in subDir pointing to parent with ".."
+      // Create .agentsynclayer.json in subDir pointing to parent with ".."
       fs.writeFileSync(
-        path.join(subDir, '.agentbus.json'),
+        path.join(subDir, '.agentsynclayer.json'),
         JSON.stringify({ bus: '..' })
       );
 
@@ -71,7 +71,7 @@ describe('config-paths (T4)', () => {
       fs.mkdirSync(busDir, { recursive: true });
 
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: busDir })
       );
 
@@ -91,7 +91,7 @@ describe('config-paths (T4)', () => {
       fs.mkdirSync(dbDir, { recursive: true });
 
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: busDir, db: dbDir })
       );
 
@@ -112,7 +112,7 @@ describe('config-paths (T4)', () => {
       fs.mkdirSync(dbDir, { recursive: true });
 
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: './bus', db: './db' })
       );
 
@@ -136,7 +136,7 @@ describe('config-paths (T4)', () => {
       fs.symlinkSync(realDir, symlinkDir, 'junction');
 
       fs.writeFileSync(
-        path.join(realDir, '.agentbus.json'),
+        path.join(realDir, '.agentsynclayer.json'),
         JSON.stringify({ bus: '.' })
       );
 
@@ -161,7 +161,7 @@ describe('config-paths (T4)', () => {
       fs.symlinkSync(realBusDir, busSymlink, 'junction');
 
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: './bus-symlink' })
       );
 

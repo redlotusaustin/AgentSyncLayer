@@ -13,8 +13,18 @@ dist/
 # SQLite databases
 *.db
 
+# AgentSyncLayer runtime data
+.agentsynclayer/
+
 # Environment variables
 .env
 
-# AgentBus runtime data
-.agentsynclayer/
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Megamemory / scanner caches
+.megamemory/
+.yafcscanner/

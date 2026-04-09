@@ -1,5 +1,5 @@
 /**
- * SQLite client module for AgentBus
+ * SQLite client module for AgentSyncLayer
  *
  * Provides durable message persistence using SQLite with FTS5 full-text search.
  * Maintains message history in WAL mode for concurrent access.
@@ -70,13 +70,13 @@ export interface MessagesSinceOptions {
 }
 
 /**
- * SQLite client for AgentBus message persistence.
+ * SQLite client for AgentSyncLayer message persistence.
  *
  * Manages a SQLite database in WAL mode with FTS5 full-text search.
  * Provides message storage, retrieval, and search capabilities.
  *
  * @example
- * const client = new SqliteClient('/path/to/project');
+ * const client = new SqliteClient('/path/to/project', 'a1b2c3d4e5f6');
  * client.insertMessage(message);
  * const { messages, total } = client.getMessages({ projectHash, limit: 50, offset: 0 });
  * client.close();
@@ -89,13 +89,14 @@ export class SqliteClient {
   /**
    * Create a new SQLite client for a project.
    *
-   * @param directory - The project directory path (used for .agentbus/ subdirectory)
+   * @param directory - The project directory path (used for .agentsynclayer/ subdirectory)
+   * @param _projectHash - 12-character project hash (unused but kept for API parity)
    * @throws {SqliteInitializationError} If the database directory cannot be created or the database cannot be opened
    */
-  constructor(directory: string) {
+  constructor(directory: string, _projectHash: string) {
     let dbDir: string;
     try {
-      dbDir = path.join(directory, '.agentbus');
+      dbDir = path.join(directory, '.agentsynclayer');
       fs.mkdirSync(dbDir, { recursive: true });
     } catch (error) {
       this._available = false;
@@ -517,24 +518,25 @@ const clientMap = new Map<string, SqliteClient>();
  * Creates a new client if one doesn't exist, or returns null if initialization fails.
  *
  * @param directory - The project directory path
+ * @param projectHash - 12-character project hash (for future use, currently unused)
  * @returns SqliteClient instance if successful, null if initialization failed
  *
  * @example
- * const sqlite = getSqliteClient('/path/to/project');
+ * const sqlite = getSqliteClient('/path/to/project', 'a1b2c3d4e5f6');
  * if (sqlite) {
  *   const messages = sqlite.getMessages({ projectHash, limit: 50, offset: 0 });
  * }
  */
-export function getSqliteClient(directory: string): SqliteClient | null {
+export function getSqliteClient(directory: string, projectHash: string): SqliteClient | null {
   const cached = clientMap.get(directory);
   if (cached) return cached;
 
   try {
-    const client = new SqliteClient(directory);
+    const client = new SqliteClient(directory, projectHash);
     clientMap.set(directory, client);
     return client;
   } catch (error) {
-    console.warn('[AgentBus] SQLite initialization failed:', error);
+    console.warn('[AgentSyncLayer] SQLite initialization failed:', error);
     return null;
   }
 }

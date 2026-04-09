@@ -9,11 +9,11 @@ describe('config-discovery (T3)', () => {
     resetBusConfig();
   });
 
-  test('T3.1: .agentbus.json in CWD with { "bus": "." } → source: config', () => {
+  test('T3.1: .agentsynclayer.json in CWD with { "bus": "." } → source: config', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: '.' })
       );
 
@@ -30,7 +30,7 @@ describe('config-discovery (T3)', () => {
     try {
       // Config in root
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: '.' })
       );
 
@@ -38,7 +38,7 @@ describe('config-discovery (T3)', () => {
       const config = resolveBusConfig(sub1);
       expect(config.source).toBe('config');
       expect(config.bus_dir).toBe(root);
-      expect(config.configPath).toBe(path.join(root, '.agentbus.json'));
+      expect(config.configPath).toBe(path.join(root, '.agentsynclayer.json'));
     } finally {
       cleanup();
     }
@@ -49,7 +49,7 @@ describe('config-discovery (T3)', () => {
     try {
       // Config in root (grandparent of sub1)
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: '.' })
       );
 
@@ -70,14 +70,14 @@ describe('config-discovery (T3)', () => {
 
       // Config in root - but it should be ignored because we hit .git
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: '.' })
       );
 
       // Config in sub1's parent (packages/)
       const packagesDir = path.join(root, 'packages');
       fs.writeFileSync(
-        path.join(packagesDir, '.agentbus.json'),
+        path.join(packagesDir, '.agentsynclayer.json'),
         JSON.stringify({ bus: '.' })
       );
 
@@ -117,11 +117,11 @@ describe('config-discovery (T3)', () => {
     expect(['default', 'config']).toContain(config.source);
   });
 
-  test('T3.6: .agentbus.json with {} (empty) → bus_dir defaults to config file dir', () => {
+  test('T3.6: .agentsynclayer.json with {} (empty) → bus_dir defaults to config file dir', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({})
       );
 
@@ -138,14 +138,14 @@ describe('config-discovery (T3)', () => {
     try {
       // Config in root
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: root })
       );
 
       // Config in packages (closer to sub1)
       const packagesDir = path.dirname(sub1);
       fs.writeFileSync(
-        path.join(packagesDir, '.agentbus.json'),
+        path.join(packagesDir, '.agentsynclayer.json'),
         JSON.stringify({ bus: packagesDir })
       );
 

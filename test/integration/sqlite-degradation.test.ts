@@ -1,7 +1,7 @@
 /**
  * SQLite Graceful Degradation Tests (T11.1-T11.4)
  *
- * Tests that AgentBus tools gracefully handle various combinations of
+ * Tests that AgentSyncLayer tools gracefully handle various combinations of
  * Redis and SQLite being available or unavailable.
  *
  * These tests require Redis to be available for most scenarios.
@@ -48,7 +48,7 @@ describe('T11: Graceful Degradation', () => {
     }
 
     await ctx.setup();
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-degradation-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-degradation-'));
     agentId = generateTestAgentId('degradation-test');
     setSessionAgentId(agentId);
 

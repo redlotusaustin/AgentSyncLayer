@@ -99,7 +99,7 @@ export async function busSendExecute(
 
     // --- Phase 1: Durable write to SQLite (BEFORE Redis check per RFC degradation table) ---
     let sqliteWriteSucceeded = false;
-    const sqlite = getSqliteClient(resolveDbDir(context.directory));
+    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
     if (sqlite) {
       try {
         sqlite.insertMessage(messageObj);

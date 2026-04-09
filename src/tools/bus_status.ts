@@ -93,6 +93,19 @@ export async function busStatusExecute(
     // SET with EX option for TTL
     await client.set(agentKey, JSON.stringify(status), 'EX', STATUS_TTL_SECONDS);
 
+    // PUBLISH status update to __status__ channel so monitors can tail it
+    const pubSubChannel = `opencode:${projectHash}:ch:__status__`;
+    const statusMessage = JSON.stringify({
+      id: `status-${Date.now()}`,
+      from: agentId,
+      channel: '__status__',
+      type: 'status',
+      payload: { text: task, files: status.files, channels: status.channels },
+      timestamp: now.toISOString(),
+      project: projectHash,
+    });
+    await client.publish(pubSubChannel, statusMessage).catch(() => {});
+
     return {
       ok: true,
       data: {

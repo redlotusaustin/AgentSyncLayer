@@ -1,5 +1,5 @@
 /**
- * Notification tracking for AgentBus
+ * Notification tracking for AgentSyncLayer
  *
  * Manages last-seen timestamps for agents to enable unread message notifications.
  * Uses Redis with a 24-hour TTL to track when each agent last read messages.
@@ -109,7 +109,7 @@ export async function updateLastSeenTimestamp(
  *
  * @example
  * const lines = buildNotificationText(messages);
- * // Returns: ['[AgentBus] Unread messages:', '- general: 3 message(s) from ...', 'Use bus_read to view details.']
+ * // Returns: ['[AgentSyncLayer] Unread messages:', '- general: 3 message(s) from ...', 'Use bus_read to view details.']
  */
 export function buildNotificationText(unread: Message[]): string[] | null {
   if (unread.length === 0) {
@@ -125,7 +125,7 @@ export function buildNotificationText(unread: Message[]): string[] | null {
   }
 
   // Build compact notification
-  const lines: string[] = ['[AgentBus] Unread messages:'];
+  const lines: string[] = ['[AgentSyncLayer] Unread messages:'];
   for (const [channel, msgs] of byChannel) {
     const senders = [...new Set(msgs.map((m) => m.from))];
     const preview = (msgs[0].payload?.text ?? '').slice(0, 60);

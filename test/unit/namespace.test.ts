@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Test directory for hash tests - use /tmp for Bun compatibility
-const testDir = path.join('/tmp', 'agentbus-test-' + Date.now());
+const testDir = path.join('/tmp', 'agentsynclayer-test-' + Date.now());
 
 beforeAll(() => {
   fs.mkdirSync(testDir, { recursive: true });

@@ -33,7 +33,7 @@ function createCleanTestDir(): {
   dir: string;
   cleanup: () => void;
 } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-clean-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-clean-'));
 
   return {
     dir,
@@ -69,7 +69,7 @@ describe('I3: Default Behavior', () => {
   beforeEach(() => {
     resetBusConfig();
     // Ensure no env var is set
-    delete process.env.AGENTBUS_BUS_ID;
+    delete process.env.AGENTSYNCLAYER_BUS_ID;
   });
 
   afterEach(() => {
@@ -84,7 +84,7 @@ describe('I3: Default Behavior', () => {
 
       try {
         // Verify no config files exist
-        expect(fs.existsSync(path.join(dir, '.agentbus.json'))).toBe(false);
+        expect(fs.existsSync(path.join(dir, '.agentsynclayer.json'))).toBe(false);
 
         // Resolve config for this directory
         const config = resolveBusConfig(dir);
@@ -104,13 +104,13 @@ describe('I3: Default Behavior', () => {
       }
     });
 
-    test('agent with no config stores SQLite DB at cwd/.agentbus/history.db', () => {
+    test('agent with no config stores SQLite DB at cwd/.agentsynclayer/history.db', () => {
       const { dir, cleanup } = createCleanTestDir();
 
       try {
         // Get project hash for this directory
         const projectHash = hashProjectPath(dir);
-        const expectedDbPath = path.join(dir, '.agentbus', 'history.db');
+        const expectedDbPath = path.join(dir, '.agentsynclayer', 'history.db');
 
         // Verify DB doesn't exist yet
         expect(fs.existsSync(expectedDbPath)).toBe(false);
@@ -123,9 +123,9 @@ describe('I3: Default Behavior', () => {
         expect(fs.existsSync(expectedDbPath)).toBe(true);
         expect(sqlite!.getDbPath()).toBe(expectedDbPath);
 
-        // DB dir should be {cwd}/.agentbus
-        const agentbusDir = path.join(dir, '.agentbus');
-        expect(fs.existsSync(agentbusDir)).toBe(true);
+        // DB dir should be {cwd}/.agentsynclayer
+        const agentsynclayerDir = path.join(dir, '.agentsynclayer');
+        expect(fs.existsSync(agentsynclayerDir)).toBe(true);
 
         // Clean up
         closeSqliteClient(dir);

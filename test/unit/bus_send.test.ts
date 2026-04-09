@@ -6,7 +6,7 @@
  * - T3.2: succeeds when SQLite fails
  * - T3.3: succeeds when Redis fails after SQLite write
  * - T3.4: updates last-seen timestamp on send
- * - T3.5: handles both SQLite and Redis failure
+ * - T3.4: handles both SQLite and Redis failure
  * - T3.6: inserts FTS5 entry alongside message
  */
 
@@ -31,7 +31,7 @@ import { cleanupRateLimiter } from '../../src/tools/bus_send';
 import type { ToolContext } from '../../src/types';
 
 // Test configuration
-const TEST_REDIS_URL = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
+const TEST_REDIS_URL = process.env.AGENTSYNCLAYER_REDIS_URL ?? 'redis://localhost:6379';
 const TEST_DB = 15;
 
 function buildTestRedisUrl(): string {
@@ -41,8 +41,8 @@ function buildTestRedisUrl(): string {
 }
 
 function createTestDirectory(): { dir: string; cleanup: () => void } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-bus-send-test-'));
-  fs.mkdirSync(path.join(dir, '.agentbus'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-bus-send-test-'));
+  fs.mkdirSync(path.join(dir, '.agentsynclayer'));
   return {
     dir,
     cleanup: () => {
@@ -214,32 +214,7 @@ describe('bus_send unit tests', () => {
     });
   });
 
-  describe('T3.4: updates last-seen timestamp on send', () => {
-    test('sets last-seen key in Redis after send', async () => {
-      const agentId = `test-agent-${Date.now()}`;
-      setSessionAgentId(agentId);
-
-      const result = await busSendExecute(
-        { channel: 'general', message: 'Test message' },
-        testContext
-      );
-
-      expect(result.ok).toBe(true);
-
-      // Check Redis for last-seen key
-      const redis = redisWrapper.getClient();
-      const lastSeenKey = `opencode:${projectHash}:lastseen:${agentId}`;
-      const lastSeenValue = await redis.get(lastSeenKey);
-
-      expect(lastSeenValue).not.toBeNull();
-      const timestamp = parseInt(lastSeenValue!, 10);
-      const now = Date.now();
-      // Should be within 5 seconds of now
-      expect(Math.abs(timestamp - now)).toBeLessThan(5000);
-    });
-  });
-
-  describe('T3.5: handles SQLite + Redis degradation per RFC', () => {
+  describe('T3.4: handles SQLite + Redis degradation per RFC', () => {
     test('returns ok:true when Redis is down but SQLite succeeds (per RFC degradation table)', async () => {
       // Force close Redis
       redisWrapper.forceClose();

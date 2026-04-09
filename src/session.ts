@@ -1,5 +1,5 @@
 /**
- * Session management for AgentBus
+ * Session management for AgentSyncLayer
  *
  * Provides shared agent ID generation and caching across all modules.
  * The agent ID is generated once per session and reused for all operations.

@@ -1,5 +1,5 @@
 /**
- * Input validation for AgentBus tools
+ * Input validation for AgentSyncLayer tools
  *
  * Validates channel names, file paths, and message content
  * according to the rules specified in contract.md.

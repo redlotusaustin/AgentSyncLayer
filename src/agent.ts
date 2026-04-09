@@ -1,5 +1,5 @@
 /**
- * Agent ID generation and management for AgentBus
+ * Agent ID generation and management for AgentSyncLayer
  *
  * Generates unique agent IDs in the format: hostname-pid-random4hex
  * Example: devbox-48201-a7f2

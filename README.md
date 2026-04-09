@@ -1,12 +1,12 @@
-# AgentBus
+# AgentSyncLayer
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.5.0
+Version 0.3.0
 
 ---
 
-AgentBus enables multiple OpenCode AI agent sessions running on the same project to communicate and coordinate with each other. It provides a message bus for broadcasting status updates, advisory file claims to prevent conflicting edits, and real-time coordination between agents—all backed by Redis for persistence and low-latency delivery.
+AgentSyncLayer enables multiple OpenCode AI agent sessions running on the same project to communicate and coordinate with each other. It provides a message bus for broadcasting status updates, advisory file claims to prevent conflicting edits, and real-time coordination between agents—all backed by Redis for persistence and low-latency delivery.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ AgentBus enables multiple OpenCode AI agent sessions running on the same project
 
 ## Overview
 
-When running multiple OpenCode agents on the same project, they operate in isolation—Agent A may refactor a file while Agent B simultaneously adds a feature that imports from it. AgentBus solves this by providing:
+When running multiple OpenCode agents on the same project, they operate in isolation—Agent A may refactor a file while Agent B simultaneously adds a feature that imports from it. AgentSyncLayer solves this by providing:
 
 - **Presence awareness** — Agents announce what they're working on
 - **File coordination** — Advisory claims prevent simultaneous edits to the same file
@@ -34,7 +34,7 @@ When running multiple OpenCode agents on the same project, they operate in isola
 - **Automatic project isolation** — Messages stay scoped to their project via path-derived namespaces
 - **Graceful degradation** — Agents continue working if Redis is unavailable
 
-### What AgentBus Is Not
+### What AgentSyncLayer Is Not
 
 - **Not a task orchestrator** — No automatic task assignment or work stealing
 - **Not a mandatory lock system** — Claims are advisory; agents can ignore them
@@ -45,7 +45,7 @@ When running multiple OpenCode agents on the same project, they operate in isola
 
 ## Features
 
-AgentBus provides 11 tools for agent coordination:
+AgentSyncLayer provides 11 tools for agent coordination:
 
 ### Messaging
 
@@ -85,7 +85,7 @@ AgentBus provides 11 tools for agent coordination:
 
 ### Environment
 
-Redis must be accessible on `localhost:6379` unless configured otherwise via `AGENTBUS_REDIS_URL`.
+Redis must be accessible on `localhost:6379` unless configured otherwise via `AGENTSYNCLAYER_REDIS_URL`.
 
 ---
 
@@ -113,13 +113,10 @@ redis-cli ping
 # Should return: PONG
 ```
 
-### 2. Install AgentBus
+### 2. Install AgentSyncLayer
 
 ```bash
-# Install via npm (published as 'agentbus')
-npm install agentbus
-
-# Or install from source
+# Install dependencies
 bun install
 
 # Verify TypeScript compiles
@@ -128,7 +125,7 @@ bun run typecheck
 
 ### 3. Load in OpenCode
 
-AgentBus integrates as an OpenCode plugin. The exact loading mechanism depends on your OpenCode setup. Generally, ensure:
+AgentSyncLayer integrates as an OpenCode plugin. The exact loading mechanism depends on your OpenCode setup. Generally, ensure:
 
 1. The plugin entry point (`src/index.ts`) is accessible
 2. OpenCode loads the plugin with project context (directory, worktree)
@@ -141,25 +138,25 @@ AgentBus integrates as an OpenCode plugin. The exact loading mechanism depends o
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENTBUS_REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `AGENTBUS_BUS_ID` | _(none)_ | Override bus identity with a directory path. Takes highest precedence over config files. |
+| `AGENTSYNCLAYER_REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
+| `AGENTSYNCLAYER_BUS_ID` | _(none)_ | Override bus identity with a directory path. Takes highest precedence over config files. |
 
 **Examples:**
 
 ```bash
 # Use default localhost Redis
-export AGENTBUS_REDIS_URL=redis://localhost:6379
+export AGENTSYNCLAYER_REDIS_URL=redis://localhost:6379
 
 # Use custom host and port
-export AGENTBUS_REDIS_URL=redis://192.168.1.100:6380
+export AGENTSYNCLAYER_REDIS_URL=redis://192.168.1.100:6380
 
 # Use Unix socket
-export AGENTBUS_REDIS_URL=unix:///var/run/redis/redis.sock
+export AGENTSYNCLAYER_REDIS_URL=unix:///var/run/redis/redis.sock
 ```
 
 ### Project Isolation
 
-AgentBus automatically isolates traffic by project. Each project gets a unique namespace derived from its canonical path:
+AgentSyncLayer automatically isolates traffic by project. Each project gets a unique namespace derived from its canonical path:
 
 ```
 /home/dev/projects/myapp → a1b2c3d4e5f6
@@ -172,7 +169,7 @@ This means:
 
 ### Shared Bus Configuration
 
-For monorepos and multi-project setups, you can share a bus namespace across different directories using a `.agentbus.json` config file:
+For monorepos and multi-project setups, you can share a bus namespace across different directories using a `.agentsynclayer.json` config file:
 
 ```json
 {
@@ -181,24 +178,24 @@ For monorepos and multi-project setups, you can share a bus namespace across dif
 ```
 
 **How it works:**
-1. AgentBus walks up from the current directory to find `.agentbus.json`
+1. AgentSyncLayer walks up from the current directory to find `.agentsynclayer.json`
 2. The config file's `bus` directory determines the project hash
 3. All agents pointing to the same `bus` directory share the same Redis namespace and SQLite database
 
 **Example: Monorepo**
 
-Place `.agentbus.json` at the monorepo root:
+Place `.agentsynclayer.json` at the monorepo root:
 
 ```json
-// /mono/.agentbus.json
+// /mono/.agentsynclayer.json
 { "bus": "." }
 ```
 
 Now agents in `/mono/packages/api` and `/mono/packages/web` share the same bus, see each other's messages, and use the same SQLite history database.
 
 **Configuration precedence (highest to lowest):**
-1. `AGENTBUS_BUS_ID` environment variable
-2. `.agentbus.json` discovered via ancestor walk
+1. `AGENTSYNCLAYER_BUS_ID` environment variable
+2. `.agentsynclayer.json` discovered via ancestor walk
 3. Default: use current working directory
 
 ---
@@ -603,7 +600,7 @@ All keys use the prefix `opencode:{project_hash}`:
 
 ### SQLite Schema
 
-SQLite provides durable message persistence in `.agentbus/history.db`:
+SQLite provides durable message persistence in `.agentsynclayer/history.db`:
 
 | Table | Purpose |
 |-------|---------|
@@ -655,10 +652,10 @@ Agents maintain presence via heartbeat:
 
 ### Session Compaction
 
-When OpenCode compacts a session, AgentBus injects coordination context:
+When OpenCode compacts a session, AgentSyncLayer injects coordination context:
 
 ```markdown
-## AgentBus — Active Coordination State
+## AgentSyncLayer — Active Coordination State
 
 ### Active Agents (2)
 - **devbox-48201-a7f2**: Refactoring login flow
@@ -680,7 +677,7 @@ The `experimental.chat.system.transform` hook proactively notifies agents of unr
 - Groups by channel and injects compact notification into system prompt
 
 ```
-[AgentBus] Unread messages:
+[AgentSyncLayer] Unread messages:
 - general: 3 message(s) from devbox-49102-b3c4, devbox-48201-a7f2 — latest: "Finished the refactor"
 - claims: 1 message(s) from devbox-49102-b3c4 — latest: "Claimed src/auth/login.ts"
 Use bus_read to view details.
@@ -758,7 +755,7 @@ bus_send(channel="my-channel", message="Hello")
 
 **Cause**: Different project namespaces.
 
-**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). In monorepos, ensure `.agentbus.json` is at the shared root.
+**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). In monorepos, ensure `.agentsynclayer.json` is at the shared root.
 
 ### Verifying bus configuration
 
@@ -777,14 +774,14 @@ bus_info()
     "bus_dir": "/home/user/monorepo",
     "db_dir": "/home/user/monorepo",
     "source": "config",
-    "configPath": "/home/user/monorepo/.agentbus.json"
+    "configPath": "/home/user/monorepo/.agentsynclayer.json"
   }
 }
 ```
 
 The `source` field shows how the bus was resolved:
-- `env` — From `AGENTBUS_BUS_ID` environment variable
-- `config` — From `.agentbus.json` file
+- `env` — From `AGENTSYNCLAYER_BUS_ID` environment variable
+- `config` — From `.agentsynclayer.json` file
 - `default` — From current working directory
 
 ---
@@ -794,36 +791,35 @@ The `source` field shows how the bus was resolved:
 ### Project Structure
 
 ```
-agentbus/
+agentsynclayer/
 ├── src/
 │   ├── index.ts           # Plugin entry point
-│   ├── adapter.ts         # OpenCode plugin adapter (tool definitions)
 │   ├── agent.ts           # Agent ID generation
-│   ├── heartbeat.ts       # Agent presence heartbeat (30s interval, 90s TTL)
+│   ├── heartbeat.ts       # Agent presence heartbeat
 │   ├── namespace.ts       # Project hash & key building
-│   ├── rate-limiter.ts    # Message rate limiting (10 msg/sec)
-│   ├── redis.ts           # Redis client wrapper with connection management
-│   ├── sqlite.ts          # SQLite client with FTS5 full-text search
+│   ├── rate-limiter.ts    # Message rate limiting
+│   ├── redis.ts           # Redis client wrapper
 │   ├── session.ts         # Session agent ID management
-│   ├── lifecycle.ts       # Shared helpers for hooks and cleanup
-│   ├── config.ts         # Bus config resolution (.agentbus.json, env vars)
-│   ├── types.ts          # TypeScript type definitions
-│   ├── validation.ts     # Input validation
+│   ├── sqlite.ts          # SQLite client with FTS5
+│   ├── types.ts           # TypeScript type definitions
+│   ├── validation.ts      # Input validation
+│   ├── adapter.ts         # OpenCode plugin adapter
+│   ├── lifecycle.ts       # Shared helpers for hooks
+│   ├── config.ts          # Bus config resolution (.agentsynclayer.json, env vars)
 │   └── tools/
 │       ├── index.ts       # Tool exports
-│       ├── bus_send.ts     # Publish message (dual-write)
-│       ├── bus_read.ts     # Read messages (Redis + SQLite)
+│       ├── bus_send.ts    # Publish message (dual-write)
+│       ├── bus_read.ts    # Read messages (SQLite fallback)
 │       ├── bus_channels.ts # List channels
-│       ├── bus_status.ts  # Update agent status
-│       ├── bus_agents.ts  # List active agents
+│       ├── bus_status.ts  # Update status
+│       ├── bus_agents.ts  # List agents
 │       ├── bus_info.ts    # Bus configuration info
-│       ├── bus_claim.ts   # Claim file (advisory lock)
-│       ├── bus_release.ts # Release claim
+│       ├── bus_claim.ts   # Claim file
+│       ├── bus_release.ts  # Release claim
 │       ├── bus_listen.ts  # Long-poll messages
 │       ├── bus_history.ts # Paginated history (SQLite)
 │       ├── bus_search.ts  # Full-text search (FTS5)
 │       └── notifications.ts # Last-seen timestamp tracking
-├── bus-monitor.ts         # CLI for inspecting and tailing bus state
 └── test/
     ├── helpers.ts
     ├── fixtures.ts
@@ -863,7 +859,7 @@ bun run typecheck
 
 ### Building
 
-AgentBus is written in TypeScript and uses Bun's built-in TypeScript support. No build step required—the source is served directly.
+AgentSyncLayer is written in TypeScript and uses Bun's built-in TypeScript support. No build step required—the source is served directly.
 
 ### Adding New Tools
 
@@ -882,7 +878,7 @@ MIT
 
 ## Related Documents
 
-- [PRD](../build_docs/0.1.0-init/PRD.md) — Product Requirements Document
-- [RFC](../build_docs/0.1.0-init/RFC.md) — Architecture and design decisions
-- [Contract](../build_docs/0.1.0-init/contract.md) — Tool interfaces, schemas, and key formats
-- [Tests](../build_docs/0.1.0-init/tests.md) — Test scenarios
+- [PRD](./PRD.md) — Product Requirements Document
+- [RFC](./RFC.md) — Architecture and design decisions
+- [Contract](./contract.md) — Tool interfaces, schemas, and key formats
+- [Tests](./tests.md) — Test scenarios

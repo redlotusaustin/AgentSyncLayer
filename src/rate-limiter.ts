@@ -1,5 +1,5 @@
 /**
- * Rate limiter for AgentBus message throttling
+ * Rate limiter for AgentSyncLayer message throttling
  *
  * Implements a sliding window rate limiter that allows a maximum
  * number of messages per second per agent.

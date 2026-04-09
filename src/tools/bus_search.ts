@@ -84,7 +84,7 @@ export async function busSearchExecute(
     const query = trimmedQuery;
 
     // Get SQLite client
-    const sqlite = getSqliteClient(resolveDbDir(context.directory));
+    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
     if (!sqlite) {
       return {
         ok: false,

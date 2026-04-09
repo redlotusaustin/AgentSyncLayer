@@ -42,7 +42,7 @@ describe('T10: Notification Tracking', () => {
     }
 
     await ctx.setup();
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-notifications-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-notifications-'));
     agentId = generateTestAgentId('notif-test');
     setSessionAgentId(agentId);
 

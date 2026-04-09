@@ -45,7 +45,7 @@ describe('T8: Dual-Write Consistency', () => {
     }
 
     await ctx.setup();
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-dualwrite-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-dualwrite-'));
     agentId = generateTestAgentId('sender');
     setSessionAgentId(agentId);
 

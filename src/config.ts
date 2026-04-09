@@ -1,17 +1,17 @@
 /**
- * Configuration resolution for AgentBus
+ * Configuration resolution for AgentSyncLayer
  *
  * Handles resolution of bus identity configuration from multiple sources:
- * 1. Environment variable: AGENTBUS_BUS_ID (highest priority)
- * 2. Config file: .agentbus.json (discovered via ancestor walk)
+ * 1. Environment variable: AGENTSYNCLAYER_BUS_ID (highest priority)
+ * 2. Config file: .agentsynclayer.json (discovered via ancestor walk)
  * 3. Default: use cwd as bus identity (lowest priority)
  *
  * The resolved configuration determines:
  * - bus_dir: Directory used for project hash computation (Redis namespace)
- * - db_dir: Directory where .agentbus/history.db is stored
+ * - db_dir: Directory where .agentsynclayer/history.db is stored
  * - projectHash: 12-character hex hash of bus_dir
  * - source: How the config was resolved ('env', 'config', or 'default')
- * - configPath: Absolute path to .agentbus.json if found, null otherwise
+ * - configPath: Absolute path to .agentsynclayer.json if found, null otherwise
  */
 
 import * as fs from 'fs';
@@ -20,7 +20,7 @@ import * as path from 'path';
 import { hashProjectPath } from './namespace';
 
 /**
- * Interface for the .agentbus.json config file schema.
+ * Interface for the .agentsynclayer.json config file schema.
  *
  * @example
  * // Minimal config (all defaults)
@@ -32,7 +32,7 @@ import { hashProjectPath } from './namespace';
  * // Both directories specified
  * { "bus": ".", "db": "/shared/data" }
  */
-export interface AgentBusConfigFile {
+export interface AgentSyncLayerConfigFile {
   /** Directory for project hash (defaults to config file's directory) */
   bus?: string;
   /** Directory for SQLite database (defaults to bus value) */
@@ -47,7 +47,7 @@ export interface AgentBusConfigFile {
  * { bus_dir: '/shared/workspace', db_dir: '/shared/workspace', projectHash: 'a1b2c3d4e5f6', source: 'env', configPath: null }
  *
  * // From config file
- * { bus_dir: '/mono', db_dir: '/mono', projectHash: 'f7e8d9c0b1a2', source: 'config', configPath: '/mono/.agentbus.json' }
+ * { bus_dir: '/mono', db_dir: '/mono', projectHash: 'f7e8d9c0b1a2', source: 'config', configPath: '/mono/.agentsynclayer.json' }
  *
  * // From default (no config)
  * { bus_dir: '/project', db_dir: '/project', projectHash: '123456789abc', source: 'default', configPath: null }
@@ -55,13 +55,13 @@ export interface AgentBusConfigFile {
 export interface BusConfig {
   /** Directory used for project hash computation (Redis key prefix) */
   bus_dir: string;
-  /** Directory where .agentbus/history.db is stored */
+  /** Directory where .agentsynclayer/history.db is stored */
   db_dir: string;
   /** 12-character hex project hash: hashProjectPath(bus_dir) */
   projectHash: string;
   /** How the config was resolved */
   source: 'env' | 'config' | 'default';
-  /** Absolute path to the .agentbus.json file, or null if not found */
+  /** Absolute path to the .agentsynclayer.json file, or null if not found */
   configPath: string | null;
 }
 
@@ -86,8 +86,8 @@ export function resetBusConfig(): void {
  * Resolve bus configuration for a given working directory.
  *
  * Resolution order:
- * 1. AGENTBUS_BUS_ID environment variable (highest priority)
- * 2. .agentbus.json file via ancestor walk (CWD to git root)
+ * 1. AGENTSYNCLAYER_BUS_ID environment variable (highest priority)
+ * 2. .agentsynclayer.json file via ancestor walk (CWD to git root)
  * 3. Default: use cwd as bus identity
  *
  * Results are cached per canonical cwd. Subsequent calls return
@@ -107,7 +107,7 @@ export function resolveBusConfig(cwd: string): BusConfig {
   try {
     canonicalCwd = fs.realpathSync(cwd);
   } catch {
-    console.warn('[AgentBus] Failed to resolve realpath of cwd, using as-is:', cwd);
+    console.warn('[AgentSyncLayer] Failed to resolve realpath of cwd, using as-is:', cwd);
     canonicalCwd = cwd;
   }
 
@@ -126,7 +126,7 @@ export function resolveBusConfig(cwd: string): BusConfig {
     return config;
   }
 
-  // Phase 2: Ancestor walk for .agentbus.json
+  // Phase 2: Ancestor walk for .agentsynclayer.json
   config = resolveFromAncestorWalk(canonicalCwd);
   if (config) {
     configCache.set(canonicalCwd, config);
@@ -140,12 +140,12 @@ export function resolveBusConfig(cwd: string): BusConfig {
 }
 
 /**
- * Attempt to resolve config from AGENTBUS_BUS_ID environment variable.
+ * Attempt to resolve config from AGENTSYNCLAYER_BUS_ID environment variable.
  *
  * @returns BusConfig if env var is set and valid, null otherwise
  */
 function resolveFromEnv(): BusConfig | null {
-  const envValue = process.env.AGENTBUS_BUS_ID;
+  const envValue = process.env.AGENTSYNCLAYER_BUS_ID;
   if (!envValue) {
     return null;
   }
@@ -155,7 +155,7 @@ function resolveFromEnv(): BusConfig | null {
 
     // Validate it's a directory
     if (!fs.statSync(busDir).isDirectory()) {
-      console.warn('[AgentBus] AGENTBUS_BUS_ID is not a directory:', envValue);
+      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID is not a directory:', envValue);
       return null;
     }
 
@@ -166,7 +166,7 @@ function resolveFromEnv(): BusConfig | null {
     try {
       fs.mkdirSync(dbDir, { recursive: true });
     } catch {
-      console.warn('[AgentBus] AGENTBUS_BUS_ID db_dir is not creatable:', dbDir);
+      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID db_dir is not creatable:', dbDir);
       return null;
     }
 
@@ -178,13 +178,13 @@ function resolveFromEnv(): BusConfig | null {
       configPath: null,
     };
   } catch {
-    console.warn('[AgentBus] AGENTBUS_BUS_ID path could not be resolved:', envValue);
+    console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID path could not be resolved:', envValue);
     return null;
   }
 }
 
 /**
- * Walk up the directory tree from cwd to find .agentbus.json.
+ * Walk up the directory tree from cwd to find .agentsynclayer.json.
  *
  * Stops when reaching filesystem root or a directory containing .git/
  *
@@ -196,7 +196,7 @@ function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
 
   // Walk up until we hit filesystem root or .git/ directory
   while (dir !== path.dirname(dir)) {
-    const configPath = path.join(dir, '.agentbus.json');
+    const configPath = path.join(dir, '.agentsynclayer.json');
     const gitPath = path.join(dir, '.git');
 
     // Check config first — config at git root should be used.
@@ -206,7 +206,7 @@ function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
         return parseConfig(configPath, dir);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error('[AgentBus] Invalid config in:', configPath, message);
+        console.error('[AgentSyncLayer] Invalid config in:', configPath, message);
       }
     }
 
@@ -225,7 +225,7 @@ function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
 }
 
 /**
- * Parse a .agentbus.json config file.
+ * Parse a .agentsynclayer.json config file.
  *
  * @param configPath - Absolute path to the config file
  * @param configDir - Directory containing the config file
@@ -234,12 +234,12 @@ function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
  */
 function parseConfig(configPath: string, configDir: string): BusConfig {
   // Read and parse JSON
-  let raw: AgentBusConfigFile;
+  let raw: AgentSyncLayerConfigFile;
   try {
     const content = fs.readFileSync(configPath, 'utf-8');
     raw = JSON.parse(content);
   } catch (error) {
-    console.warn('[AgentBus] Failed to read/parse config file:', configPath, error instanceof Error ? error.message : String(error));
+    console.warn('[AgentSyncLayer] Failed to read/parse config file:', configPath, error instanceof Error ? error.message : String(error));
     throw new Error('Failed to parse config');
   }
 
@@ -253,21 +253,21 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
       busDir = fs.realpathSync(path.join(configDir, busRelative));
     }
   } catch {
-    console.warn('[AgentBus] Config bus directory could not be resolved:', busRelative);
+    console.warn('[AgentSyncLayer] Config bus directory could not be resolved:', busRelative);
     throw new Error('Invalid bus directory');
   }
 
   // Validate bus_dir is a directory
   try {
     if (!fs.statSync(busDir).isDirectory()) {
-      console.warn('[AgentBus] Config bus is not a directory:', busDir);
+      console.warn('[AgentSyncLayer] Config bus is not a directory:', busDir);
       throw new Error('bus is not a directory');
     }
   } catch (error) {
     if (error instanceof Error && error.message === 'bus is not a directory') {
       throw error;
     }
-    console.warn('[AgentBus] Config bus directory does not exist:', busDir);
+    console.warn('[AgentSyncLayer] Config bus directory does not exist:', busDir);
     throw new Error('bus directory does not exist');
   }
 
@@ -281,7 +281,7 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
       dbDir = fs.realpathSync(path.join(configDir, dbRelative));
     }
   } catch {
-    console.warn('[AgentBus] Config db directory could not be resolved:', dbRelative);
+    console.warn('[AgentSyncLayer] Config db directory could not be resolved:', dbRelative);
     throw new Error('Invalid db directory');
   }
 
@@ -292,14 +292,14 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
     const outside = [];
     if (dbOutside) outside.push('db_dir');
     if (busOutside) outside.push('bus_dir');
-    console.warn(`[AgentBus] ${outside.join(' and ')} ${outside.length === 1 ? 'is' : 'are'} outside the project tree. This may indicate a misconfiguration or intentional cross-project shared bus.`);
+    console.warn(`[AgentSyncLayer] ${outside.join(' and ')} ${outside.length === 1 ? 'is' : 'are'} outside the project tree. This may indicate a misconfiguration or intentional cross-project shared bus.`);
   }
 
   // Ensure db_dir is creatable
   try {
     fs.mkdirSync(dbDir, { recursive: true });
   } catch {
-    console.warn('[AgentBus] Config db directory is not creatable:', dbDir);
+    console.warn('[AgentSyncLayer] Config db directory is not creatable:', dbDir);
     throw new Error('db directory is not creatable');
   }
 

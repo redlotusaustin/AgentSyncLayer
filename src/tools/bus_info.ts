@@ -1,5 +1,5 @@
 /**
- * bus_info tool - Get AgentBus configuration info
+ * bus_info tool - Get AgentSyncLayer configuration info
  *
  * Returns the resolved bus configuration for the current project.
  */

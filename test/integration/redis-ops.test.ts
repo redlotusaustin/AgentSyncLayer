@@ -1,7 +1,7 @@
 /**
  * Redis Operations Integration Tests
  *
- * Tests Redis-backed operations for AgentBus including:
+ * Tests Redis-backed operations for AgentSyncLayer including:
  * - Message publishing and reading
  * - Channel management
  * - Agent status storage with TTL

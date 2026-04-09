@@ -13,9 +13,9 @@ import type { Message } from '../../src/types';
 
 // Test helper to create a temporary SQLite database
 function createTestSqliteDb(): { db: Database; dir: string; cleanup: () => void } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-sqlite-test-'));
-  fs.mkdirSync(path.join(dir, '.agentbus'));
-  const dbPath = path.join(dir, '.agentbus', 'history.db');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-sqlite-test-'));
+  fs.mkdirSync(path.join(dir, '.agentsynclayer'));
+  const dbPath = path.join(dir, '.agentsynclayer', 'history.db');
   const db = new Database(dbPath);
   db.exec('PRAGMA journal_mode = WAL');
 

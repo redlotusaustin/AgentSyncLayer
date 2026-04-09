@@ -42,7 +42,7 @@ describe('T9: Fallback Behavior', () => {
     }
 
     await ctx.setup();
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbus-fallback-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-fallback-'));
     agentId = generateTestAgentId('fallback-test');
     setSessionAgentId(agentId);
 

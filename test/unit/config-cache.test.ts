@@ -38,7 +38,7 @@ describe('config-cache (T6)', () => {
     }
   });
 
-  test('T6.3: reset then modify .agentbus.json → new call picks up changes', () => {
+  test('T6.3: reset then modify .agentsynclayer.json → new call picks up changes', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       // Initially no config file
@@ -49,7 +49,7 @@ describe('config-cache (T6)', () => {
       const busDir = path.join(root, 'new-bus');
       fs.mkdirSync(busDir, { recursive: true });
       fs.writeFileSync(
-        path.join(root, '.agentbus.json'),
+        path.join(root, '.agentsynclayer.json'),
         JSON.stringify({ bus: './new-bus' })
       );
 

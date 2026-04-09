@@ -1,5 +1,5 @@
 /**
- * Lifecycle helpers for AgentBus plugin
+ * Lifecycle helpers for AgentSyncLayer plugin
  *
  * Shared utilities for agent cleanup and coordination context retrieval.
  * These functions accept projectHash and agentId as explicit parameters
@@ -213,7 +213,7 @@ export function formatCompactionContext(
   recentMessages: Message[]
 ): string {
   const lines: string[] = [];
-  lines.push('## AgentBus — Active Coordination State');
+  lines.push('## ASL — Active Coordination State');
   lines.push('');
 
   if (agents.length > 0) {
@@ -291,6 +291,6 @@ export async function cleanupAgent(projectHash: string, agentId: string): Promis
       }
     } while (cursor !== '0' && keysScanned < SCAN_MAX_KEYS);
   } catch (error) {
-    console.warn('[AgentBus] Cleanup error:', error);
+    console.warn('[AgentSyncLayer] Cleanup error:', error);
   }
 }

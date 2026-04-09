@@ -1,5 +1,5 @@
 /**
- * AgentBus Monitor — External CLI for inspecting and tailing bus state
+ * AgentSyncLayer Monitor — External CLI for inspecting and tailing bus state
  *
  * Modes:
  *   bun run bus-monitor.ts                           # One-shot snapshot (default)
@@ -126,20 +126,20 @@ function resolvePaths(args: CliArgs): ResolvedPaths {
   let dbPath: string;
 
   if (args.db) {
-    // --db takes precedence; derive project dir from grandparent (db is at .agentbus/history.db)
+    // --db takes precedence; derive project dir from grandparent (db is at .agentsynclayer/history.db)
     dbPath = args.db;
-    const agentbusDir = path.dirname(dbPath);
-    projectDir = path.dirname(agentbusDir);
+    const agentsynclayerDir = path.dirname(dbPath);
+    projectDir = path.dirname(agentsynclayerDir);
     // If --project also given, use that for the hash instead
     if (args.project) {
       projectDir = args.project;
     }
   } else if (args.project) {
     projectDir = args.project;
-    dbPath = path.join(projectDir, ".agentbus", "history.db");
+    dbPath = path.join(projectDir, ".agentsynclayer", "history.db");
   } else {
     projectDir = process.cwd();
-    dbPath = path.join(projectDir, ".agentbus", "history.db");
+    dbPath = path.join(projectDir, ".agentsynclayer", "history.db");
   }
 
   // Resolve to canonical path
@@ -327,7 +327,7 @@ async function collectSnapshot(
 // ---------------------------------------------------------------------------
 
 function renderSnapshot(paths: ResolvedPaths, data: SnapshotData): void {
-  console.log(bold("╔══ AgentBus Monitor ═══"));
+  console.log(bold("╔══ AgentSyncLayer Monitor ═══"));
   console.log(dim(`  project: ${paths.projectDir}`));
   console.log(dim(`  hash:    ${paths.projectHash}`));
   console.log(dim(`  db:      ${data.sqlite.dbPath}`));
@@ -419,7 +419,7 @@ async function followMode(
   let running = true;
 
   // ioredis needs a dedicated connection for subscribing
-  const sub = new Redis(process.env.AGENTBUS_REDIS_URL ?? "redis://localhost:6379/0", {
+  const sub = new Redis(process.env.AGENTSYNCLAYER_REDIS_URL ?? "redis://localhost:6379/0", {
     lazyConnect: true, connectTimeout: 3000, retryStrategy: () => null, maxRetriesPerRequest: 0,
   });
 
@@ -445,6 +445,10 @@ async function followMode(
 
   // Determine which channels to subscribe to
   let channelsToSubscribe: string[];
+  // Always include __status__ so status updates are visible in follow mode
+  const statusChannel = `${prefix}ch:__status__`;
+  const claimsChannel = `${prefix}ch:claims`;
+
   if (args.follow === true) {
     // All channels — discover from Redis set or use filter
     if (args.channel.size > 0) {
@@ -463,6 +467,13 @@ async function followMode(
   } else {
     // Specific channel
     channelsToSubscribe = [`${prefix}ch:${args.follow}`];
+  }
+
+  // Add system channels (avoid duplicates)
+  for (const sysCh of [statusChannel, claimsChannel]) {
+    if (!channelsToSubscribe.includes(sysCh)) {
+      channelsToSubscribe.push(sysCh);
+    }
   }
 
   if (channelsToSubscribe.length > 0) {
@@ -533,7 +544,7 @@ async function followMode(
 // ---------------------------------------------------------------------------
 
 async function connectRedis(): Promise<Redis | null> {
-  const redis = new Redis(process.env.AGENTBUS_REDIS_URL ?? "redis://localhost:6379/0", {
+  const redis = new Redis(process.env.AGENTSYNCLAYER_REDIS_URL ?? "redis://localhost:6379/0", {
     lazyConnect: true, connectTimeout: 3000, retryStrategy: () => null, maxRetriesPerRequest: 0,
   });
   try {
