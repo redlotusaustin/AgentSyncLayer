@@ -38,6 +38,13 @@ const DEFAULT_TIMEOUT_SECONDS = 10;
 const MAX_MESSAGES_PER_CALL = 100;
 
 /**
+ * Module-level storage for last check timestamp across calls.
+ * Keyed by projectHash for multi-project isolation.
+ * Persists within same session/process.
+ */
+const busListenLastCheckTime = new Map<string, number>();
+
+/**
  * Execute bus_listen: blocking wait for new messages on channels
  *
  * Strategy:
@@ -67,12 +74,12 @@ export async function busListenExecute(
   }
 
   try {
-    // Validate and normalize channels
+    // Validate and normalize channels (can throw ValidationException)
     const channels = args.channels && args.channels.length > 0
       ? args.channels.map((c) => validateChannel(c))
       : ['general'];
 
-    // Validate timeout
+    // Validate timeout (can throw ValidationException)
     const timeoutSeconds = validateTimeout(args.timeout ?? DEFAULT_TIMEOUT_SECONDS);
 
     // Use session agent ID (persists across all tool calls) for self-filtering
@@ -86,13 +93,14 @@ export async function busListenExecute(
     const historyKeys = channels.map((ch) => `opencode:${projectHash}:history:${ch}`);
 
     // Track the earliest timestamp we've seen (start from now to avoid duplicates on first call)
-    // Using module-level storage to persist across calls within same session
+    // Using Map keyed by projectHash to persist across calls within same session
     const now = Date.now();
-    if (!busListenLastCheckTime || busListenLastCheckTime < now - 60000) {
+    const lastCheck = busListenLastCheckTime.get(projectHash) ?? 0;
+    if (!lastCheck || lastCheck < now - 60000) {
       // If no previous check or last check was > 1 minute ago, start from now
-      busListenLastCheckTime = now;
+      busListenLastCheckTime.set(projectHash, now);
     }
-    const lastCheckTime = busListenLastCheckTime;
+    const lastCheckTime = busListenLastCheckTime.get(projectHash)!;
 
     // Calculate deadline
     const deadline = Date.now() + timeoutSeconds * 1000;
@@ -101,76 +109,71 @@ export async function busListenExecute(
     const accumulatedMessages: Message[] = [];
 
     // Create a dedicated client for blocking operations
-    // BRPOP blocks the connection, so we need a separate client
-    const blockingClient = redis.createClient();
+    // BRPOP blocks the connection, so we need a separate client (cached per RedisClient)
+    const blockingClient = redis.getBlockingClient();
 
-    try {
-      // Blocking loop - continues until we have messages or timeout
-      while (Date.now() < deadline) {
-        const remainingSeconds = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
+    // Blocking loop - continues until we have messages or timeout
+    while (Date.now() < deadline) {
+      const remainingSeconds = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
 
-        // BRPOP: blocking pop from queue with timeout
-        // This is just a wake-up signal - actual messages come from sorted set
-        // Returns [key, value] or null if timeout
-        const result = await blockingClient.brpop(queueKey, remainingSeconds) as [string, string] | null;
+      // BRPOP: blocking pop from queue with timeout
+      // This is just a wake-up signal - actual messages come from sorted set
+      // Returns [key, value] or null if timeout
+      const result = await blockingClient.brpop(queueKey, remainingSeconds) as [string, string] | null;
 
-        // Update last check time whenever we wake up (whether from BRPOP or timeout)
-        busListenLastCheckTime = Date.now();
+      // Update last check time whenever we wake up (whether from BRPOP or timeout)
+      busListenLastCheckTime.set(projectHash, Date.now());
 
-        if (result) {
-          // BRPOP fired - new message(s) available
-          // Fetch ALL messages from sorted set history since last check (non-destructive)
-          const newMessages = await fetchMessagesSinceTimestamp(
-            redis,
-            historyKeys,
-            lastCheckTime,
-            agentId,
-          );
+      if (result) {
+        // BRPOP fired - new message(s) available
+        // Fetch ALL messages from sorted set history since last check (non-destructive)
+        const newMessages = await fetchMessagesSinceTimestamp(
+          redis,
+          historyKeys,
+          lastCheckTime,
+          agentId,
+        );
 
-          // Add to accumulated messages
-          for (const msg of newMessages) {
-            if (accumulatedMessages.length < MAX_MESSAGES_PER_CALL) {
-              accumulatedMessages.push(msg);
-            }
-          }
-
-          // If we have messages, return immediately (low latency is key)
-          if (accumulatedMessages.length > 0) {
-            break;
+        // Add to accumulated messages
+        for (const msg of newMessages) {
+          if (accumulatedMessages.length < MAX_MESSAGES_PER_CALL) {
+            accumulatedMessages.push(msg);
           }
         }
-        // If no messages found (empty set or only own messages), continue loop
-        // BRPOP timeout or no new messages - check deadline and loop
+
+        // If we have messages, return immediately (low latency is key)
+        if (accumulatedMessages.length > 0) {
+          break;
+        }
       }
+      // If no messages found (empty set or only own messages), continue loop
+      // BRPOP timeout or no new messages - check deadline and loop
+    }
 
-      accumulatedMessages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    accumulatedMessages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-      // Return messages or timeout
-      if (accumulatedMessages.length > 0) {
-        return {
-          ok: true,
-          data: {
-            messages: accumulatedMessages,
-            count: accumulatedMessages.length,
-            polled: false,
-            timeout: false,
-          },
-        };
-      }
-
+    // Return messages or timeout
+    if (accumulatedMessages.length > 0) {
       return {
         ok: true,
         data: {
-          messages: [],
-          count: 0,
+          messages: accumulatedMessages,
+          count: accumulatedMessages.length,
           polled: false,
-          timeout: true,
+          timeout: false,
         },
       };
-    } finally {
-      // Always close the dedicated blocking client
-      await blockingClient.quit().catch(() => {});
     }
+
+    return {
+      ok: true,
+      data: {
+        messages: [],
+        count: 0,
+        polled: false,
+        timeout: true,
+      },
+    };
   } catch (error) {
     if (error instanceof ValidationException) {
       return {
@@ -188,12 +191,6 @@ export async function busListenExecute(
     };
   }
 }
-
-/**
- * Module-level storage for last check timestamp across calls
- * Persists within same session/process
- */
-let busListenLastCheckTime = 0;
 
 /**
  * Fetch messages from sorted set history since a given timestamp
@@ -236,9 +233,13 @@ async function fetchMessagesSinceTimestamp(
 }
 
 /**
- * Reset the last check timestamp (for testing)
+ * Reset the last check timestamp for a specific project (for testing)
  * Call this between test runs to prevent state leakage
  */
-export function resetBusListenState(): void {
-  busListenLastCheckTime = 0;
+export function resetBusListenState(projectHash?: string): void {
+  if (projectHash) {
+    busListenLastCheckTime.delete(projectHash);
+  } else {
+    busListenLastCheckTime.clear();
+  }
 }

@@ -17,7 +17,7 @@ const SCAN_BATCH_SIZE = 100;
 const SCAN_MAX_KEYS = 10000;
 
 /** Maximum number of messages to keep in channel history */
-const HISTORY_CAP = 100;
+export const HISTORY_CAP = 100;
 
 /** Claim event channel name for coordination events */
 const CLAIMS_CHANNEL = 'claims';

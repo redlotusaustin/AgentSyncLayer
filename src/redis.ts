@@ -75,6 +75,9 @@ export class RedisClient {
   /** Map of channel -> Set of callbacks (deduplicates handlers) */
   private readonly channelCallbacks = new Map<string, Set<(message: string) => void>>();
 
+  /** Cached blocking client for BRPOP/BLPOP operations */
+  private blockingClient: Redis | null = null;
+
   constructor(config?: RedisConfig) {
     const redisUrl = process.env.AGENTBUS_REDIS_URL ?? config?.url ?? 'redis://localhost:6379';
     this.maxRetries = config?.maxRetries ?? 3;
@@ -88,7 +91,33 @@ export class RedisClient {
     });
 
     this.setupEventHandlers();
+    this.setupMessageHandler();
     this.connect();
+  }
+
+  /**
+   * Set up a single 'message' event handler that dispatches to channel callbacks.
+   * This is registered once in the constructor and handles all channel subscriptions.
+   */
+  private setupMessageHandler(): void {
+    this.client.on('message', (channel: string, message: string) => {
+      const callbacks = this.channelCallbacks.get(channel);
+      if (callbacks) {
+        callbacks.forEach((cb) => cb(message));
+      }
+    });
+  }
+
+  /**
+   * Get or create the blocking client for BRPOP/BLPOP operations.
+   * The blocking client is cached and reused across calls.
+   */
+  getBlockingClient(): Redis {
+    if (!this.blockingClient) {
+      const redisUrl = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
+      this.blockingClient = new Redis(redisUrl, this.clientOptions);
+    }
+    return this.blockingClient;
   }
 
   private get clientOptions() {
@@ -185,9 +214,6 @@ export class RedisClient {
     if (!this.channelCallbacks.has(channel)) {
       this.channelCallbacks.set(channel, new Set());
       await this.client.subscribe(channel);
-      this.client.on('message', (ch: string, msg: string) => {
-        this.channelCallbacks.get(ch)?.forEach((cb) => cb(msg));
-      });
     }
 
     this.channelCallbacks.get(channel)!.add(callback);
@@ -203,13 +229,16 @@ export class RedisClient {
 
   getClient(): Redis { return this.client; }
 
-  createClient(): Redis {
-    return new Redis(process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379', this.clientOptions);
-  }
-
   async close(): Promise<void> {
     this._connected = false;
     this._state = 'disconnected';
+    
+    // Close the blocking client if it exists
+    if (this.blockingClient) {
+      await this.blockingClient.quit();
+      this.blockingClient = null;
+    }
+    
     await this.client.quit();
   }
 

@@ -201,17 +201,7 @@ export async function busClaimExecute(
 
     // Conflict - another agent holds the claim
     if (conflictClaim) {
-      return {
-        ok: false,
-        error: `File '${filePath}' is already claimed by agent ${conflictClaim.agentId} (claimed at ${conflictClaim.claimedAt}, expires at ${conflictClaim.expiresAt})`,
-        code: 'CLAIM_CONFLICT',
-        data: {
-          path: filePath,
-          heldBy: conflictClaim.agentId,
-          claimedAt: conflictClaim.claimedAt,
-          expiresAt: conflictClaim.expiresAt,
-        },
-      };
+      return buildClaimConflictResponse(filePath, conflictClaim, false);
     }
 
     // Race condition during script execution - retry once

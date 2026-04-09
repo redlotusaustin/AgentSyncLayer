@@ -16,6 +16,7 @@ import { RateLimiter } from '../rate-limiter';
 import { getSessionAgentId } from '../session';
 import { getSqliteClient } from '../sqlite';
 import { updateLastSeenTimestamp } from './notifications';
+import { HISTORY_CAP } from '../lifecycle';
 import type {
   Message,
   MessagePayload,
@@ -27,9 +28,6 @@ import type {
 
 // Rate limiter instance (shared across tool calls)
 const rateLimiter = new RateLimiter();
-
-/** Maximum number of messages to keep in channel history */
-const HISTORY_CAP = 100;
 
 /**
  * Clean up rate limiter state (call on session end to prevent memory leaks)
