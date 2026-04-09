@@ -32,12 +32,12 @@
   "author": "AgentSyncLayer contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/spicymango/AgentSyncLayer.git",
+    "url": "https://github.com/redlotusaustin/AgentSyncLayer.git",
     "directory": "AgentSyncLayer"
   },
-  "homepage": "https://github.com/spicymango/AgentSyncLayer/tree/main/AgentSyncLayer#readme",
+  "homepage": "https://github.com/redlotusaustin/AgentSyncLayer/tree/main/AgentSyncLayer#readme",
   "bugs": {
-    "url": "https://github.com/spicymango/AgentSyncLayer/issues"
+    "url": "https://github.com/redlotusaustin/AgentSyncLayer/issues"
   },
   "scripts": {
     "test": "bun test",

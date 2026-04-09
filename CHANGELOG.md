@@ -1,0 +1,94 @@
+# Changelog
+
+All notable changes to AgentSyncLayer will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.5.2] - 2026-04-09
+
+### Changed
+- npm publishing readiness: explicit `private: false`, updated README version, added CHANGELOG
+
+## [0.5.1] - 2026-04-09
+
+### Fixed
+- Pre-distribution fixes across 5 stages (full audit, bug hunt, code review)
+- Corrected FTS5 hidden column assertion in schema test
+- Addressed 4 bugs from adversarial bug hunt (atomic Lua claims, session agent ID, rate limiter cleanup, BRPOP)
+- Addressed 7 code review findings (error handling, validation, TypeScript strictness)
+- Full audit deviations resolved (missing error codes, README inconsistencies)
+
+### Refactored
+- Simplified and cleaned up code across 8 source files
+- Removed dead code across 7 source files
+- Deduplicated logic and improved code quality
+- Batched Redis operations and switched to blocking listen for performance
+
+### Added
+- Biome for linting and formatting
+
+## [0.5.0] - 2026-04-06
+
+### Added
+- SQLite-backed message persistence with FTS5 full-text search
+- `bus_history` tool for paginated deep history queries
+- `bus_search` tool for full-text search across message history
+- `bus_info` tool for resolved bus configuration inspection
+- `bus_listen` tool for long-poll message waiting
+- Session compaction hook for coordination context injection
+- Unread message notifications via system transform hook
+- `bus-monitor.ts` CLI for inspecting and tailing bus state (snapshot, watch, follow modes)
+- Dual-write durability (Redis cache + SQLite persistent storage)
+- WAL mode SQLite for concurrent read/write performance
+
+### Changed
+- Redis history sorted sets now serve as fast cache (capped at 100 messages)
+- SQLite is the source of truth for full message history
+- Renamed AgentBus to AgentSyncLayer throughout
+
+## [0.3.0] - 2026-03-20
+
+### Added
+- Shared bus identity configuration via `.agentsynclayer.json` config file
+- `AGENTSYNCLAYER_BUS_ID` environment variable for bus override
+- `bus_info` diagnostic tool for resolved bus configuration
+- Configuration precedence: env var > config file > default directory
+- Monorepo support via shared bus namespace
+
+### Fixed
+- Config ancestor walk error visibility and warning logic
+- 7 code review issues from initial review pass
+
+### Performance
+- Reduced syscalls and eliminated redundant computations in config resolution
+
+## [0.2.0] - 2026-03-18
+
+### Added
+- SQLite persistence layer for durable message history
+- External CLI bus monitor script with watch and follow modes
+- Bus usage instructions injected into system prompt
+
+### Fixed
+- Guard against undefined `args.task` in `bus_status`
+- Shared session agent ID between plugin and tools
+- Atomic file claims via Redis Lua script
+- Configurable SCAN count for Redis key enumeration
+
+### Changed
+- Bumped version to 0.2.0
+
+## [0.1.0] - 2026-03-15
+
+### Added
+- Initial release with Redis-backed pub/sub messaging
+- `bus_send`, `bus_read`, `bus_channels` tools
+- `bus_status`, `bus_agents` tools for agent coordination
+- `bus_claim`, `bus_release` tools for advisory file locking
+- Project isolation via path-derived namespace hashing
+- Agent heartbeat protocol (30s interval, 90s TTL)
+- Rate limiting (10 messages/second per agent)
+- Graceful degradation when Redis is unavailable
+- OpenCode plugin adapter with Zod schema validation
+- Test helpers, fixtures, and integration tests
