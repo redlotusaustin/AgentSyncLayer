@@ -311,21 +311,21 @@ async function collectSnapshot(
         } catch { /* skip malformed */ }
         }
 
-        const lsKeys: string[] = [];
-        cursor = '0';
-        do {
-          const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', `${prefix}lastseen:*`, 'COUNT', 100);
-          cursor = nextCursor;
-          lsKeys.push(...keys);
-        } while (cursor !== '0');
-        for (const key of lsKeys) {
-          const [tsStr, ttl] = await Promise.all([redis.get(key), redis.ttl(key)]);
-          data.redis.lastSeens.push({
-            agentId: key.split(":").pop()!,
-            timestamp: tsStr ? parseInt(tsStr, 10) : 0,
-            ttl,
-          });
-        }
+      const lsKeys: string[] = [];
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', `${prefix}lastseen:*`, 'COUNT', 100);
+        cursor = nextCursor;
+        lsKeys.push(...keys);
+      } while (cursor !== '0');
+      for (const key of lsKeys) {
+        const [tsStr, ttl] = await Promise.all([redis.get(key), redis.ttl(key)]);
+        data.redis.lastSeens.push({
+          agentId: key.split(":").pop()!,
+          timestamp: tsStr ? parseInt(tsStr, 10) : 0,
+          ttl,
+        });
+      }
     } catch (err) {
       console.error(`Redis query error: ${err instanceof Error ? err.message : err}`);
     }

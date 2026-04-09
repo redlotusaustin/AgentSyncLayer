@@ -2,9 +2,10 @@
  * bus_send tool - Publish a message to an AgentBus channel
  *
  * Operations:
- * 1. Publish message to pub/sub channel
- * 2. Add message to sorted set history
- * 3. Add channel to active channels set
+ * 1. PUBLISH message to pub/sub channel
+ * 2. ZADD message to sorted set history
+ * 3. ZREMRANGEBYRANK to prune history to 100 messages
+ * 4. SADD channel to active channels set
  */
 
 import * as crypto from 'crypto';

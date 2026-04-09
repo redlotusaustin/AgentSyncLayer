@@ -129,3 +129,70 @@ describe('Schema: initializeTestSqliteSchema() alignment', () => {
     });
   });
 });
+
+describe('Schema: FTS5 Search Snippet Extraction (T4)', () => {
+  let ctx: ReturnType<typeof createTestSqliteContext>;
+
+  beforeAll(async () => {
+    ctx = createTestSqliteContext();
+    await ctx.setup();
+  });
+
+  afterAll(async () => {
+    await ctx.teardown();
+  });
+
+  test('T4: FTS5 search returns snippets from text column, not raw JSON', () => {
+    const db = ctx.db;
+
+    // Insert a message with a searchable payload
+    const testMessage = {
+      id: `test-${Date.now()}`,
+      channel: 'general',
+      from: 'test-agent',
+      type: 'info',
+      payload: JSON.stringify({ text: 'hello world search target' }),
+      timestamp: new Date().toISOString(),
+      project: 'testproject',
+      created_at: Date.now(),
+    };
+
+    db.prepare(`
+      INSERT INTO messages (id, channel, "from", type, payload, timestamp, project, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      testMessage.id,
+      testMessage.channel,
+      testMessage.from,
+      testMessage.type,
+      testMessage.payload,
+      testMessage.timestamp,
+      testMessage.project,
+      testMessage.created_at
+    );
+
+    // Search for the message using the text column content
+    const searchQuery = 'search target';
+    const sanitizedQuery = `"${searchQuery}"*`;
+
+    const results = db.prepare(`
+      SELECT m.*, fts.rank,
+        snippet(messages_fts, 4, '>>', '<<', '...', 32) as snippet
+      FROM messages_fts fts
+      JOIN messages m ON m.id = fts.id
+      WHERE messages_fts MATCH ? AND m.project = ?
+      ORDER BY fts.rank
+      LIMIT 10
+    `).all(sanitizedQuery, 'testproject') as Array<{ snippet: string; payload: string }>;
+
+    expect(results.length).toBeGreaterThan(0);
+    const result = results[0];
+
+    // The snippet should contain readable text, not raw JSON like {"text":"..."}
+    expect(result.snippet).toContain('search target');
+
+    // Verify it's NOT the raw JSON payload (should be readable text, not JSON structure)
+    expect(result.snippet).not.toContain('{"text":');
+    expect(result.snippet).not.toContain('"search target"'); // Raw JSON value marker
+  });
+});
