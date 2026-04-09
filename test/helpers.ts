@@ -221,13 +221,6 @@ export async function getTestProjectHash(directory: string): Promise<string> {
 }
 
 /**
- * Skip tests if Redis is not available
- */
-export function skipIfNoRedis(): void {
-  // This is a placeholder - actual skip happens in test files
-}
-
-/**
  * Mock time passage for rate limiter tests
  */
 export class MockTime {
@@ -405,9 +398,12 @@ export function createTestSqliteContext(): TestSqliteContext {
         );
         CREATE INDEX IF NOT EXISTS idx_channels_project ON channels(project);
         CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
-          id UNINDEXED, channel, "from", type UNINDEXED, payload,
-          content=messages, content_rowid=rowid
+          id UNINDEXED, channel, "from", type UNINDEXED, text, payload
         );
+        CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+          INSERT INTO messages_fts(id, channel, "from", type, text, payload)
+          VALUES (new.id, new.channel, new."from", new.type, json_extract(new.payload, '$.text'), new.payload);
+        END;
       `);
       db.close();
     },
@@ -454,29 +450,18 @@ export function initializeTestSqliteSchema(db: Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_channels_project ON channels(project);
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
-      id UNINDEXED, channel, "from", type UNINDEXED, payload,
-      content=messages, content_rowid=rowid
+      id UNINDEXED, channel, "from", type UNINDEXED, text, payload
     );
+    CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+      INSERT INTO messages_fts(id, channel, "from", type, text, payload)
+      VALUES (new.id, new.channel, new."from", new.type, json_extract(new.payload, '$.text'), new.payload);
+    END;
   `);
 }
 
 // ============================================================================
 // Config test helpers
 // ============================================================================
-
-/**
- * Create a temporary directory with optional .agentsynclayer.json config.
- *
- * Useful for testing config resolution from CWD or env vars.
- *
- * @param config - Optional .agentsynclayer.json content
- * @returns Object with root path and cleanup function
- *
- * @example
- * const { root, cleanup } = createTestBusEnv({ bus: '.' });
- * // root/.agentsynclayer.json will be created
- * cleanup();
- */
 export function createTestBusEnv(
   config?: Record<string, string>
 ): {

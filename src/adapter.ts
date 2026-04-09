@@ -185,7 +185,7 @@ const bus_info = tool({
 const bus_claim = tool({
   description: "Claim a file for editing (advisory lock). Prevents other agents from editing the same file.",
   args: {
-    path: z.string().describe("The file path to claim"),
+    path: z.string().min(1).max(512).describe("The file path to claim (relative, e.g. 'src/auth/login.ts')"),
   },
   async execute(args, context) {
     const result = await busClaimExecute(args, toAgentBusContext(context));
@@ -199,7 +199,7 @@ const bus_claim = tool({
 const bus_release = tool({
   description: "Release a file claim. Must be the owner of the claim to release it.",
   args: {
-    path: z.string().describe("The file path to release"),
+    path: z.string().max(512).describe("The file path to release (relative, e.g. 'src/auth/login.ts')"),
   },
   async execute(args, context) {
     const result = await busReleaseExecute(args, toAgentBusContext(context));

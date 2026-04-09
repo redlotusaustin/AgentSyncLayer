@@ -92,6 +92,7 @@ export async function busHistoryExecute(
 
     // Update last-seen timestamp (fire-and-forget)
     const agentId = getSessionAgentId();
+    // Non-critical: notification timestamp is best-effort; failure doesn't affect message delivery
     await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
 
     return {

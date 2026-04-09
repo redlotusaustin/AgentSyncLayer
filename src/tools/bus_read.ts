@@ -95,6 +95,7 @@ export async function busReadExecute(
     }
 
     // --- Phase 3: Update last-seen timestamp ---
+    // Non-critical: notification timestamp is best-effort; failure doesn't affect message delivery
     await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
 
     // --- Phase 4: Check if either store was available ---

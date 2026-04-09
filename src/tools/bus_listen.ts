@@ -140,6 +140,7 @@ export async function busListenExecute(
           return bTime - aTime;
         });
         // Mark messages as seen so they do not reappear as unread
+        // Non-critical: notification timestamp is best-effort; failure doesn't affect message delivery
         await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
 
         return {

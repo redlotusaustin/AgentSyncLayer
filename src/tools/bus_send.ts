@@ -4,8 +4,7 @@
  * Operations:
  * 1. Publish message to pub/sub channel
  * 2. Add message to sorted set history
- * 3. Prune history to 100 messages (SQLite holds full history)
- * 4. Add channel to active channels set
+ * 3. Add channel to active channels set
  */
 
 import * as crypto from 'crypto';
@@ -150,16 +149,7 @@ export async function busSendExecute(
     // 3. ZREMRANGEBYRANK to prune to 100 messages (keep newest 100)
     pipeline.zremrangebyrank(historyKey, 0, -(HISTORY_CAP + 1));
 
-    // 4. LPUSH to message queue for blocking listeners (BRPOP)
-    const queueKey = `opencode:${projectHash}:queue`;
-    pipeline.lpush(queueKey, messageJson);
-
-    // 5. ZREMRANGEBYRANK to cap queue at 1000 items (keep newest 1000)
-    // Prevents unbounded queue growth from stale BRPOP items
-    const QUEUE_CAP = 1000;
-    pipeline.ltrim(queueKey, 0, QUEUE_CAP - 1);
-
-    // 6. SADD channel to active channels set
+    // 4. SADD channel to active channels set
     const channelsKey = `opencode:${projectHash}:channels`;
     pipeline.sadd(channelsKey, channel);
 
@@ -174,6 +164,7 @@ export async function busSendExecute(
     }
 
     // Also update last-seen timestamp for the sending agent
+    // Non-critical: notification timestamp is best-effort; failure doesn't affect message delivery
     await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
 
     return {

@@ -288,9 +288,15 @@ async function collectSnapshot(
       for (const ch of filteredChs) {
         const count = await redis.zcard(`${prefix}history:${ch}`);
         data.redis.cacheChannels.push({ name: ch, count });
-      }
+        }
 
-      const agentKeys = await redis.keys(`${prefix}agent:*`);
+      const agentKeys: string[] = [];
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', `${prefix}agent:*`, 'COUNT', 100);
+        cursor = nextCursor;
+        agentKeys.push(...keys);
+      } while (cursor !== '0');
       for (const key of agentKeys) {
         const [dataStr, ttl] = await Promise.all([redis.get(key), redis.ttl(key)]);
         if (!dataStr) continue;
@@ -303,9 +309,15 @@ async function collectSnapshot(
             channels: p.channels ?? [],
           });
         } catch { /* skip malformed */ }
-      }
+        }
 
-        const lsKeys = await redis.keys(`${prefix}lastseen:*`);
+        const lsKeys: string[] = [];
+        cursor = '0';
+        do {
+          const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', `${prefix}lastseen:*`, 'COUNT', 100);
+          cursor = nextCursor;
+          lsKeys.push(...keys);
+        } while (cursor !== '0');
         for (const key of lsKeys) {
           const [tsStr, ttl] = await Promise.all([redis.get(key), redis.ttl(key)]);
           data.redis.lastSeens.push({

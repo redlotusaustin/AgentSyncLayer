@@ -104,6 +104,7 @@ export async function busStatusExecute(
       timestamp: now.toISOString(),
       project: projectHash,
     });
+    // Non-critical: status publish is best-effort; failure doesn't affect status storage
     await client.publish(pubSubChannel, statusMessage).catch(() => {});
 
     return {
