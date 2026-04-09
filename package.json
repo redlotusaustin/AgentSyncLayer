@@ -1,5 +1,5 @@
 {
-  "name": "agentsynclayer",
+  "name": "opencode-asl",
   "version": "0.5.2",
   "description": "Redis-backed pub/sub messaging for coordinating multiple AI agent sessions",
   "license": "MIT",
