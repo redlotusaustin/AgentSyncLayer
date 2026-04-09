@@ -78,7 +78,7 @@ export class RateLimiter {
       const retryAfter = WINDOW_MS - elapsed;
       throw new RateLimitException(
         `Rate limit exceeded: max ${this.maxPerSecond} messages per second. ` +
-        `Retry after ${retryAfter}ms.`
+          `Retry after ${retryAfter}ms.`,
       );
     }
 

@@ -1,9 +1,9 @@
 /**
  * Smoke test: exercises the full SQLite persistence flow end-to-end.
  */
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 // --- Setup ---
 const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'smoke-'));
@@ -11,12 +11,12 @@ const projectDir = path.join(testDir, 'project');
 fs.mkdirSync(projectDir, { recursive: true });
 
 import { hashProjectPath } from './src/namespace';
-import { busSendExecute } from './src/tools/bus_send';
-import { busReadExecute } from './src/tools/bus_read';
-import { busHistoryExecute } from './src/tools/bus_history';
-import { busSearchExecute } from './src/tools/bus_search';
-import { getSqliteClient, closeSqliteClient } from './src/sqlite';
 import { getRedisClient } from './src/redis';
+import { closeSqliteClient, getSqliteClient } from './src/sqlite';
+import { busHistoryExecute } from './src/tools/bus_history';
+import { busReadExecute } from './src/tools/bus_read';
+import { busSearchExecute } from './src/tools/bus_search';
+import { busSendExecute } from './src/tools/bus_send';
 
 const projectHash = hashProjectPath(projectDir);
 console.log(`Project hash: ${projectHash}`);
@@ -31,19 +31,34 @@ console.log(`DB path: ${sqlite?.getDbPath()}`);
 
 // --- Phase 2: bus_send (dual-write) ---
 console.log('\n=== Phase 2: bus_send (dual-write) ===');
-const sendResult1 = await busSendExecute({ channel: 'general', type: 'info', message: 'Hello from agent A' }, ctx);
+const sendResult1 = await busSendExecute(
+  { channel: 'general', type: 'info', message: 'Hello from agent A' },
+  ctx,
+);
 console.log(`Send 1: ok=${sendResult1.ok}`);
 
-const sendResult2 = await busSendExecute({ channel: 'general', type: 'coordination', message: 'Task assignment: implement SQLite persistence' }, ctx);
+const sendResult2 = await busSendExecute(
+  {
+    channel: 'general',
+    type: 'coordination',
+    message: 'Task assignment: implement SQLite persistence',
+  },
+  ctx,
+);
 console.log(`Send 2: ok=${sendResult2.ok}`);
 
-const sendResult3 = await busSendExecute({ channel: 'build', type: 'info', message: 'Build started for feature branch' }, ctx);
+const sendResult3 = await busSendExecute(
+  { channel: 'build', type: 'info', message: 'Build started for feature branch' },
+  ctx,
+);
 console.log(`Send 3 (build channel): ok=${sendResult3.ok}`);
 
 // --- Phase 3: bus_read (Redis first) ---
 console.log('\n=== Phase 3: bus_read (Redis cache) ===');
 const readResult = await busReadExecute({ channel: 'general', limit: 20 }, ctx);
-console.log(`Read 'general': ok=${readResult.ok}, count=${readResult.data?.count}, total=${readResult.data?.total}`);
+console.log(
+  `Read 'general': ok=${readResult.ok}, count=${readResult.data?.count}, total=${readResult.data?.total}`,
+);
 if (readResult.ok) {
   for (const msg of (readResult.data as any).messages) {
     console.log(`  [${msg.type}] ${msg.from}: ${(msg.payload as any).text}`);
@@ -53,15 +68,21 @@ if (readResult.ok) {
 // --- Phase 4: bus_history (SQLite deep read) ---
 console.log('\n=== Phase 4: bus_history (paginated from SQLite) ===');
 const historyResult = await busHistoryExecute({ channel: 'general', page: 1, per_page: 10 }, ctx);
-console.log(`History 'general' p1: ok=${historyResult.ok}, count=${(historyResult.data as any)?.count}, total=${(historyResult.data as any)?.total}, pages=${(historyResult.data as any)?.total_pages}`);
+console.log(
+  `History 'general' p1: ok=${historyResult.ok}, count=${(historyResult.data as any)?.count}, total=${(historyResult.data as any)?.total}, pages=${(historyResult.data as any)?.total_pages}`,
+);
 
 const allHistory = await busHistoryExecute({ page: 1, per_page: 10 }, ctx);
-console.log(`History (all channels): ok=${allHistory.ok}, count=${(allHistory.data as any)?.count}, total=${(allHistory.data as any)?.total}`);
+console.log(
+  `History (all channels): ok=${allHistory.ok}, count=${(allHistory.data as any)?.count}, total=${(allHistory.data as any)?.total}`,
+);
 
 // --- Phase 5: bus_search (FTS5) ---
 console.log('\n=== Phase 5: bus_search (FTS5 full-text) ===');
 const searchResult = await busSearchExecute({ query: 'SQLite persistence' }, ctx);
-console.log(`Search 'SQLite persistence': ok=${searchResult.ok}, count=${(searchResult.data as any)?.count}`);
+console.log(
+  `Search 'SQLite persistence': ok=${searchResult.ok}, count=${(searchResult.data as any)?.count}`,
+);
 if (searchResult.ok) {
   for (const r of (searchResult.data as any).results) {
     console.log(`  [rank=${r.rank}] ${r.message.channel}: ${r.snippet}`);
@@ -69,7 +90,9 @@ if (searchResult.ok) {
 }
 
 const searchResult2 = await busSearchExecute({ query: 'build', channel: 'build' }, ctx);
-console.log(`Search 'build' in 'build': ok=${searchResult2.ok}, count=${(searchResult2.data as any)?.count}`);
+console.log(
+  `Search 'build' in 'build': ok=${searchResult2.ok}, count=${(searchResult2.data as any)?.count}`,
+);
 
 // --- Phase 6: Fallback test (flush Redis, read from SQLite) ---
 console.log('\n=== Phase 6: Fallback (flush Redis -> read from SQLite) ===');
@@ -80,8 +103,12 @@ if (redis.checkConnection()) {
   console.log('Flushed Redis sorted set for general channel');
 
   const fallbackRead = await busReadExecute({ channel: 'general', limit: 20 }, ctx);
-  console.log(`Fallback read: ok=${fallbackRead.ok}, count=${fallbackRead.data?.count}, total=${fallbackRead.data?.total}`);
-  console.log(`  -> Successfully fell back to SQLite: ${fallbackRead.data?.count > 0 ? 'YES' : 'NO'}`);
+  console.log(
+    `Fallback read: ok=${fallbackRead.ok}, count=${fallbackRead.data?.count}, total=${fallbackRead.data?.total}`,
+  );
+  console.log(
+    `  -> Successfully fell back to SQLite: ${fallbackRead.data?.count > 0 ? 'YES' : 'NO'}`,
+  );
 }
 
 // --- Phase 7: Message count ---

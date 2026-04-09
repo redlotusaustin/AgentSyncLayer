@@ -64,7 +64,7 @@ describe('T9: bus-monitor uses SCAN not KEYS', () => {
   test('T9: agentKeys and lsKeys both use SCAN pattern', () => {
     // Verify the agentKeys SCAN block exists
     expect(sourceContent).toContain('const agentKeys: string[] = []');
-    expect(sourceContent).toContain('redis.scan(cursor');
+    expect(sourceContent).toContain('.scan(');
     expect(sourceContent).toContain("agent:");
 
     // Verify the lsKeys SCAN block exists

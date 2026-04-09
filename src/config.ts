@@ -14,8 +14,8 @@
  * - configPath: Absolute path to .agentsynclayer.json if found, null otherwise
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 import { hashProjectPath } from './namespace';
 
@@ -239,7 +239,11 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
     const content = fs.readFileSync(configPath, 'utf-8');
     raw = JSON.parse(content);
   } catch (error) {
-    console.warn('[AgentSyncLayer] Failed to read/parse config file:', configPath, error instanceof Error ? error.message : String(error));
+    console.warn(
+      '[AgentSyncLayer] Failed to read/parse config file:',
+      configPath,
+      error instanceof Error ? error.message : String(error),
+    );
     throw new Error('Failed to parse config');
   }
 
@@ -292,7 +296,9 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
     const outside = [];
     if (dbOutside) outside.push('db_dir');
     if (busOutside) outside.push('bus_dir');
-    console.warn(`[AgentSyncLayer] ${outside.join(' and ')} ${outside.length === 1 ? 'is' : 'are'} outside the project tree. This may indicate a misconfiguration or intentional cross-project shared bus.`);
+    console.warn(
+      `[AgentSyncLayer] ${outside.join(' and ')} ${outside.length === 1 ? 'is' : 'are'} outside the project tree. This may indicate a misconfiguration or intentional cross-project shared bus.`,
+    );
   }
 
   // Ensure db_dir is creatable

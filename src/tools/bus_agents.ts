@@ -6,14 +6,10 @@
  * 2. Return agent list
  */
 
-import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
 import { getActiveAgents } from '../lifecycle';
-import type {
-  ToolContext,
-  ToolResponse,
-  AgentsResponseData,
-} from '../types';
+import { getRedisClient } from '../redis';
+import type { AgentsResponseData, ToolContext, ToolResponse } from '../types';
 
 function unavailableResponse(): ToolResponse<AgentsResponseData> {
   return {
@@ -25,7 +21,7 @@ function unavailableResponse(): ToolResponse<AgentsResponseData> {
 
 export async function busAgentsExecute(
   _args: Record<string, never>,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<AgentsResponseData>> {
   if (!getRedisClient().checkConnection()) {
     return unavailableResponse();

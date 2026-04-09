@@ -6,18 +6,13 @@
  * 2. ZCARD for total count
  */
 
+import { resolveDbDir, resolveProjectHash } from '../config';
 import { getRedisClient } from '../redis';
-import { resolveProjectHash, resolveDbDir } from '../config';
-import { validateChannel, validateLimit, ValidationException } from '../validation';
-import { getSqliteClient } from '../sqlite';
 import { getSessionAgentId } from '../session';
+import { getSqliteClient } from '../sqlite';
+import type { Message, ReadResponseData, ToolContext, ToolResponse } from '../types';
+import { ValidationException, validateChannel, validateLimit } from '../validation';
 import { updateLastSeenTimestamp } from './notifications';
-import type {
-  Message,
-  ToolContext,
-  ToolResponse,
-  ReadResponseData,
-} from '../types';
 
 /**
  * Tool arguments for bus_read
@@ -36,7 +31,7 @@ export interface BusReadArgs {
  */
 export async function busReadExecute(
   args: BusReadArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<ReadResponseData>> {
   const redis = getRedisClient();
 
@@ -76,7 +71,7 @@ export async function busReadExecute(
     }
 
     // --- Phase 2: Fallback to SQLite if Redis empty ---
-    // 
+    //
     // KNOWN LIMITATION: This fallback is triggered when Redis returns zero messages,
     // not when Redis has "stale" data. If Redis has older messages but SQLite has
     // newer ones, bus_read may return stale data. Per RFC, bus_read falls back to

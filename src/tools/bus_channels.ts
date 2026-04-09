@@ -6,14 +6,9 @@
  * 2. ZCARD for each channel to get message count
  */
 
-import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
-import type {
-  ChannelInfo,
-  ToolContext,
-  ToolResponse,
-  ChannelsResponseData,
-} from '../types';
+import { getRedisClient } from '../redis';
+import type { ChannelInfo, ChannelsResponseData, ToolContext, ToolResponse } from '../types';
 
 /**
  * Execute bus_channels: list active channels with message counts
@@ -24,7 +19,7 @@ import type {
  */
 export async function busChannelsExecute(
   _args: Record<string, never>,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<ChannelsResponseData>> {
   const redis = getRedisClient();
 

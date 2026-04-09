@@ -287,7 +287,10 @@ export interface ToolArgs {
 /**
  * Tool execute function signature
  */
-export type ToolExecute<T extends ToolArgs, R> = (args: T, context: ToolContext) => Promise<ToolResponse<R>>;
+export type ToolExecute<T extends ToolArgs, R> = (
+  args: T,
+  context: ToolContext,
+) => Promise<ToolResponse<R>>;
 
 /**
  * Redis key types for namespace construction

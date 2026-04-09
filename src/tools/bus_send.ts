@@ -8,23 +8,28 @@
  * 4. SADD channel to active channels set
  */
 
-import * as crypto from 'crypto';
-import { getRedisClient } from '../redis';
-import { resolveProjectHash, resolveDbDir } from '../config';
-import { validateChannel, validateMessage, validateMessageType, ValidationException } from '../validation';
+import * as crypto from 'node:crypto';
+import { resolveDbDir, resolveProjectHash } from '../config';
+import { HISTORY_CAP } from '../lifecycle';
 import { RateLimiter } from '../rate-limiter';
+import { getRedisClient } from '../redis';
 import { getSessionAgentId } from '../session';
 import { getSqliteClient } from '../sqlite';
-import { updateLastSeenTimestamp } from './notifications';
-import { HISTORY_CAP } from '../lifecycle';
 import type {
   Message,
   MessagePayload,
+  MessageType,
+  SendResponseData,
   ToolContext,
   ToolResponse,
-  SendResponseData,
-  MessageType,
 } from '../types';
+import {
+  ValidationException,
+  validateChannel,
+  validateMessage,
+  validateMessageType,
+} from '../validation';
+import { updateLastSeenTimestamp } from './notifications';
 
 // Rate limiter instance (shared across tool calls)
 const rateLimiter = new RateLimiter();
@@ -54,7 +59,7 @@ export interface BusSendArgs {
  */
 export async function busSendExecute(
   args: BusSendArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<SendResponseData>> {
   try {
     // Validate inputs

@@ -8,8 +8,8 @@
  * or when multiple agents start at the same second.
  */
 
-import * as crypto from 'crypto';
-import * as os from 'os';
+import * as crypto from 'node:crypto';
+import * as os from 'node:os';
 
 /**
  * Agent ID pattern: hostname-pid-random4hex

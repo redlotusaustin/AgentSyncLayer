@@ -8,8 +8,8 @@
  * Key format: opencode:{projectHash}:{type}:{identifier}
  */
 
-import * as crypto from 'crypto';
-import * as fs from 'fs';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
 import type { KeyType } from './types';
 
 /**
@@ -26,11 +26,7 @@ export function hashProjectPath(directory: string): string {
   const canonical = fs.realpathSync(directory);
 
   // SHA-256 hash, take first 12 hex chars (48 bits of entropy)
-  const hash = crypto
-    .createHash('sha256')
-    .update(canonical)
-    .digest('hex')
-    .slice(0, 12);
+  const hash = crypto.createHash('sha256').update(canonical).digest('hex').slice(0, 12);
 
   return hash;
 }
@@ -145,4 +141,3 @@ export class KeyBuilder {
 export function createKeyBuilder(projectHash: string): KeyBuilder {
   return new KeyBuilder(projectHash);
 }
-

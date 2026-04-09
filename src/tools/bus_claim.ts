@@ -7,17 +7,12 @@
  * 3. Return conflict info if already claimed
  */
 
-import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
-import { validateFilePath, ValidationException } from '../validation';
-import { getSessionAgentId } from '../session';
 import { publishClaimEvent } from '../lifecycle';
-import type {
-  Claim,
-  ToolContext,
-  ClaimResponseData,
-  ClaimConflictData,
-} from '../types';
+import { getRedisClient } from '../redis';
+import { getSessionAgentId } from '../session';
+import type { Claim, ClaimConflictData, ClaimResponseData, ToolContext } from '../types';
+import { ValidationException, validateFilePath } from '../validation';
 
 /**
  * Default TTL for file claims (300 seconds / 5 minutes as per contract)
@@ -31,7 +26,7 @@ function buildClaimSuccessResponse(
   filePath: string,
   agentId: string,
   claimedAt: string,
-  expiresAt: string
+  expiresAt: string,
 ): { ok: true; data: ClaimResponseData } {
   return {
     ok: true,
@@ -50,10 +45,12 @@ function buildClaimSuccessResponse(
 function buildClaimConflictResponse(
   filePath: string,
   conflictClaim: Claim | null,
-  isRetry: boolean
+  isRetry: boolean,
 ): { ok: false; error: string; code: 'CLAIM_CONFLICT'; data: ClaimConflictData } {
   if (conflictClaim) {
-    const extra = isRetry ? '' : ` (claimed at ${conflictClaim.claimedAt}, expires at ${conflictClaim.expiresAt})`;
+    const extra = isRetry
+      ? ''
+      : ` (claimed at ${conflictClaim.claimedAt}, expires at ${conflictClaim.expiresAt})`;
     return {
       ok: false,
       error: `File '${filePath}' is already claimed by agent ${conflictClaim.agentId}${extra}`,
@@ -139,11 +136,15 @@ export interface BusClaimArgs {
  */
 export async function busClaimExecute(
   args: BusClaimArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<
   | { ok: true; data: ClaimResponseData }
   | { ok: false; error: string; code: 'CLAIM_CONFLICT'; data: ClaimConflictData }
-  | { ok: false; error: string; code: 'BUS_UNAVAILABLE' | 'PATH_INVALID' | 'CLAIM_CONFLICT' | 'INTERNAL_ERROR' }
+  | {
+      ok: false;
+      error: string;
+      code: 'BUS_UNAVAILABLE' | 'PATH_INVALID' | 'CLAIM_CONFLICT' | 'INTERNAL_ERROR';
+    }
 > {
   const redis = getRedisClient();
 
@@ -180,14 +181,14 @@ export async function busClaimExecute(
     };
 
     // Use Lua script for atomic check-and-set (fixes TOCTOU race condition)
-    const scriptResult = await client.eval(
+    const scriptResult = (await client.eval(
       CLAIM_SCRIPT,
       1,
       claimKey,
       agentId,
       JSON.stringify(claim),
-      CLAIM_TTL_SECONDS
-    ) as [number, Claim | null];
+      CLAIM_TTL_SECONDS,
+    )) as [number, Claim | null];
 
     const [ok, conflictClaim] = scriptResult;
 
@@ -205,14 +206,14 @@ export async function busClaimExecute(
     }
 
     // Race condition during script execution - retry once
-    const retryResult = await client.eval(
+    const retryResult = (await client.eval(
       CLAIM_SCRIPT,
       1,
       claimKey,
       agentId,
       JSON.stringify(claim),
-      CLAIM_TTL_SECONDS
-    ) as [number, Claim | null];
+      CLAIM_TTL_SECONDS,
+    )) as [number, Claim | null];
 
     const [retryOk, retryConflict] = retryResult;
 

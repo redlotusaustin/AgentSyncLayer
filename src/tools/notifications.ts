@@ -51,10 +51,7 @@ export function buildLastSeenKey(projectHash: string, agentId: string): string {
  * const timestamp = await getLastSeenTimestamp('a1b2c3d4e5f6', 'devbox-48201-a7f2');
  * // Returns: 1712589000000 or 0 if never set
  */
-export async function getLastSeenTimestamp(
-  projectHash: string,
-  agentId: string
-): Promise<number> {
+export async function getLastSeenTimestamp(projectHash: string, agentId: string): Promise<number> {
   const redis = getRedisClient();
   if (!redis.checkConnection()) {
     return 0;
@@ -85,7 +82,7 @@ export async function getLastSeenTimestamp(
  */
 export async function updateLastSeenTimestamp(
   projectHash: string,
-  agentId?: string
+  agentId?: string,
 ): Promise<void> {
   const redis = getRedisClient();
   if (!redis.checkConnection()) {
@@ -130,7 +127,7 @@ export function buildNotificationText(unread: Message[]): string[] | null {
     const senders = [...new Set(msgs.map((m) => m.from))];
     const preview = (msgs[0].payload?.text ?? '').slice(0, 60);
     lines.push(
-      `- ${channel}: ${msgs.length} message(s) from ${senders.join(', ')} — latest: "${preview}"`
+      `- ${channel}: ${msgs.length} message(s) from ${senders.join(', ')} — latest: "${preview}"`,
     );
   }
   lines.push('Use bus_read to view details.');
