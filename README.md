@@ -808,18 +808,20 @@ agentbus/
 │   ├── config.ts          # Bus config resolution (.agentbus.json, env vars)
 │   └── tools/
 │       ├── index.ts       # Tool exports
-│       ├── bus_send.ts    # Publish message (dual-write)
-│       ├── bus_read.ts    # Read messages (SQLite fallback)
+│       ├── bus_send.ts     # Publish message (dual-write)
+│       ├── bus_read.ts     # Read messages (SQLite fallback)
 │       ├── bus_channels.ts # List channels
 │       ├── bus_status.ts  # Update status
 │       ├── bus_agents.ts  # List agents
 │       ├── bus_info.ts    # Bus configuration info
 │       ├── bus_claim.ts   # Claim file
-│       ├── bus_release.ts  # Release claim
+│       ├── bus_release.ts # Release claim
 │       ├── bus_listen.ts  # Long-poll messages
 │       ├── bus_history.ts # Paginated history (SQLite)
 │       ├── bus_search.ts  # Full-text search (FTS5)
 │       └── notifications.ts # Last-seen timestamp tracking
+├── bus-monitor.ts         # CLI for inspecting and tailing bus state
+├── smoke-test.ts          # Basic smoke tests for tool execution
 └── test/
     ├── helpers.ts
     ├── fixtures.ts
@@ -878,7 +880,7 @@ MIT
 
 ## Related Documents
 
-- [PRD](./PRD.md) — Product Requirements Document
-- [RFC](./RFC.md) — Architecture and design decisions
-- [Contract](./contract.md) — Tool interfaces, schemas, and key formats
-- [Tests](./tests.md) — Test scenarios
+- [PRD](../build_docs/0.1.0-init/PRD.md) — Product Requirements Document
+- [RFC](../build_docs/0.1.0-init/RFC.md) — Architecture and design decisions
+- [Contract](../build_docs/0.1.0-init/contract.md) — Tool interfaces, schemas, and key formats
+- [Tests](../build_docs/0.1.0-init/tests.md) — Test scenarios
