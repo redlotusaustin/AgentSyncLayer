@@ -288,8 +288,9 @@ async function collectSnapshot(
       for (const ch of filteredChs) {
         const count = await redis.zcard(`${prefix}history:${ch}`);
         data.redis.cacheChannels.push({ name: ch, count });
-        }
+      }
 
+      // Collect agent keys using SCAN (non-blocking)
       const agentKeys: string[] = [];
       let cursor = '0';
       do {
@@ -309,10 +310,11 @@ async function collectSnapshot(
             channels: p.channels ?? [],
           });
         } catch { /* skip malformed */ }
-        }
+      }
 
+      // Collect last-seen keys using SCAN (non-blocking)
       const lsKeys: string[] = [];
-      let cursor = '0';
+      cursor = '0';
       do {
         const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', `${prefix}lastseen:*`, 'COUNT', 100);
         cursor = nextCursor;
