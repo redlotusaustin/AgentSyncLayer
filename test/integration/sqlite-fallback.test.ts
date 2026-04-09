@@ -202,7 +202,7 @@ describe('T9: Fallback Behavior', () => {
       // bus_listen should succeed (not return BUS_UNAVAILABLE)
       expect(listenResult.ok).toBe(true);
       expect(listenResult.data).toBeDefined();
-      expect(listenResult.data!.polled).toBe(true);
+      
       expect(listenResult.data!.timeout).toBe(true);
     });
 
@@ -220,7 +220,7 @@ describe('T9: Fallback Behavior', () => {
 
       // Should complete successfully (timeout is expected)
       expect(listenResult.ok).toBe(true);
-      expect(listenResult.data!.polled).toBe(true);
+      
       expect(listenResult.data!.timeout).toBe(true);
     });
   });

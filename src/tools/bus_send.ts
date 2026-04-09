@@ -28,6 +28,9 @@ import type {
 // Rate limiter instance (shared across tool calls)
 const rateLimiter = new RateLimiter();
 
+/** Maximum number of messages to keep in channel history */
+const HISTORY_CAP = 100;
+
 /**
  * Clean up rate limiter state (call on session end to prevent memory leaks)
  */
@@ -146,10 +149,14 @@ export async function busSendExecute(
     const timestampMs = Date.now();
     pipeline.zadd(historyKey, timestampMs, messageJson);
 
-    // 3. ZREMRANGEBYRANK to prune to 500 messages (keep newest 500)
-    pipeline.zremrangebyrank(historyKey, 0, -101);
+    // 3. ZREMRANGEBYRANK to prune to 100 messages (keep newest 100)
+    pipeline.zremrangebyrank(historyKey, 0, -(HISTORY_CAP + 1));
 
-    // 4. SADD channel to active channels set
+    // 4. LPUSH to message queue for blocking listeners (BRPOP)
+    const queueKey = `opencode:${projectHash}:queue`;
+    pipeline.lpush(queueKey, messageJson);
+
+    // 5. SADD channel to active channels set
     const channelsKey = `opencode:${projectHash}:channels`;
     pipeline.sadd(channelsKey, channel);
 

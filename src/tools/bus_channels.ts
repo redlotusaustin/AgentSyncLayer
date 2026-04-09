@@ -56,17 +56,18 @@ export async function busChannelsExecute(
       };
     }
 
-    // Get message count for each channel in parallel
-    const channelInfos: ChannelInfo[] = await Promise.all(
-      channelNames.map(async (name): Promise<ChannelInfo> => {
-        const historyKey = `opencode:${projectHash}:history:${name}`;
-        const messageCount = await client.zcard(historyKey);
-        return {
-          name,
-          messages: messageCount,
-        };
-      })
-    );
+    // Get message count for each channel using pipeline (single round-trip)
+    const pipeline = client.pipeline();
+    for (const name of channelNames) {
+      const historyKey = `opencode:${projectHash}:history:${name}`;
+      pipeline.zcard(historyKey);
+    }
+    const pipelineResults = await pipeline.exec();
+
+    const channelInfos: ChannelInfo[] = channelNames.map((name, index) => ({
+      name,
+      messages: pipelineResults?.[index]?.[1] ?? 0,
+    }));
 
     // Sort by name for consistent output
     channelInfos.sort((a, b) => a.name.localeCompare(b.name));

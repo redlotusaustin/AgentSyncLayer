@@ -331,6 +331,29 @@ export class RedisClient {
   }
 
   /**
+   * Create a new dedicated ioredis client
+   *
+   * Use this for operations that block the connection (like BRPOP/BLPOP).
+   * Each blocking operation should use its own dedicated client.
+   *
+   * @returns A new ioredis client instance
+   */
+  createClient(): Redis {
+    const redisUrl = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
+    return new Redis(redisUrl, {
+      maxRetriesPerRequest: this.maxRetries,
+      retryStrategy: (times: number) => {
+        if (times > this.maxRetries) {
+          return null;
+        }
+        return this.retryDelayMs;
+      },
+      enableOfflineQueue: true,
+      connectTimeout: 10000,
+    });
+  }
+
+  /**
    * Close the Redis connection
    *
    * Calls disconnect() on the underlying client.

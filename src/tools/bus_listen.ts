@@ -1,9 +1,9 @@
 /**
  * bus_listen tool - Long-poll for new messages on channels
  *
- * Implementation: Smart polling (v1)
- * - Records current timestamp
- * - Polls every 500ms for new messages
+ * Implementation: BRPOP blocking pop (v2)
+ * - Uses dedicated subscriber connection for BRPOP
+ * - Reads from message queue for low-latency delivery
  * - Filters out own messages (self-filter)
  * - Returns on new messages or timeout
  */
@@ -33,12 +33,7 @@ export interface BusListenArgs {
 const DEFAULT_TIMEOUT_SECONDS = 10;
 
 /**
- * Poll interval in milliseconds
- */
-const POLL_INTERVAL_MS = 500;
-
-/**
- * Execute bus_listen: poll for new messages on channels
+ * Execute bus_listen: blocking pop for new messages on channels
  *
  * @param args - Tool arguments (channels, timeout)
  * @param context - Tool context (directory)
@@ -73,67 +68,72 @@ export async function busListenExecute(
 
     // Get project hash
     const projectHash = resolveProjectHash(context.directory);
-    const client = redis.getClient();
 
-    // Record start time
-    const startTime = Date.now();
-    const endTime = startTime + timeoutSeconds * 1000;
+    // Get queue key for BRPOP
+    const queueKey = `opencode:${projectHash}:queue`;
 
-    // Get latest message timestamp per channel (for filtering)
-    const latestTimestamps = await Promise.all(
-      channels.map(async (channel) => {
-        const historyKey = `opencode:${projectHash}:history:${channel}`;
-        const latest = await client.zrevrange(historyKey, 0, 0);
-        const timestamp = latest.length > 0
-          ? new Date(JSON.parse(latest[0]).timestamp).getTime()
-          : startTime;
-        return { channel, timestamp };
-      })
-    );
+    // Calculate remaining time based on timeout
+    const deadline = Date.now() + timeoutSeconds * 1000;
 
-    const timestampMap = new Map<string, number>(
-      latestTimestamps.map((item) => [item.channel, item.timestamp])
-    );
+    // Track accumulated messages across blocking calls
+    const accumulatedMessages: Message[] = [];
 
-    // Polling loop
-    while (Date.now() < endTime) {
-      const newMessages: Message[] = [];
+    // Create a dedicated client for blocking operations
+    // BRPOP blocks the connection, so we need a separate client
+    const blockingClient = redis.createClient();
 
-      // Check each channel for new messages
-      for (const channel of channels) {
-        const historyKey = `opencode:${projectHash}:history:${channel}`;
-        const sinceTimestamp = timestampMap.get(channel) ?? startTime;
+    try {
+      // Blocking loop - continues until we have messages or timeout
+      while (Date.now() < deadline) {
+        const remainingSeconds = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
 
-        // Get messages with timestamp > sinceTimestamp
-        // ZREVRANGEBYSCORE with exclusive min
-        const messages = await client.zrevrangebyscore(
-          historyKey,
-          `(${sinceTimestamp}`,
-          '+inf'
-        );
+        // BRPOP: blocking pop from queue with timeout
+        // Returns [key, value] or null if timeout
+        const result = await blockingClient.brpop(queueKey, remainingSeconds) as [string, string] | null;
 
-        // Parse and filter messages
-        for (const msgJson of messages) {
+        if (result) {
+          const [, msgJson] = result;
           try {
             const msg = JSON.parse(msgJson) as Message;
+
             // Self-filter: exclude messages from this agent
             if (msg.from !== agentId) {
-              // Update timestamp for this channel
-              const msgTimestamp = new Date(msg.timestamp).getTime();
-              if (msgTimestamp > (timestampMap.get(channel) ?? 0)) {
-                timestampMap.set(channel, msgTimestamp);
+              // Channel filter: only include messages from requested channels
+              if (channels.includes(msg.channel)) {
+                accumulatedMessages.push(msg);
               }
-              newMessages.push(msg);
+            }
+
+            // If we have accumulated messages, return immediately
+            // (Don't wait for more - low latency is key)
+            if (accumulatedMessages.length > 0) {
+              // Sort by timestamp (newest first)
+              accumulatedMessages.sort((a, b) => {
+                const aTime = new Date(a.timestamp).getTime();
+                const bTime = new Date(b.timestamp).getTime();
+                return bTime - aTime;
+              });
+
+              return {
+                ok: true,
+                data: {
+                  messages: accumulatedMessages,
+                  count: accumulatedMessages.length,
+                  polled: false,
+                  timeout: false,
+                },
+              };
             }
           } catch {
-            // Skip malformed messages
+            // Skip malformed messages and continue
           }
         }
+        // If result is null, timeout occurred - continue loop to check deadline
       }
 
-      if (newMessages.length > 0) {
-        // Sort by timestamp (newest first) - use cached timestamp for efficiency
-        newMessages.sort((a, b) => {
+      // Timeout reached - return accumulated messages or empty
+      if (accumulatedMessages.length > 0) {
+        accumulatedMessages.sort((a, b) => {
           const aTime = new Date(a.timestamp).getTime();
           const bTime = new Date(b.timestamp).getTime();
           return bTime - aTime;
@@ -142,28 +142,27 @@ export async function busListenExecute(
         return {
           ok: true,
           data: {
-            messages: newMessages,
-            count: newMessages.length,
-            polled: true,
+            messages: accumulatedMessages,
+            count: accumulatedMessages.length,
+            polled: false,
             timeout: false,
           },
         };
       }
 
-      // Wait before next poll
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      return {
+        ok: true,
+        data: {
+          messages: [],
+          count: 0,
+          polled: false,
+          timeout: true,
+        },
+      };
+    } finally {
+      // Always close the dedicated blocking client
+      await blockingClient.quit().catch(() => {});
     }
-
-    // Timeout reached - return empty response
-    return {
-      ok: true,
-      data: {
-        messages: [],
-        count: 0,
-        polled: true,
-        timeout: true,
-      },
-    };
   } catch (error) {
     if (error instanceof ValidationException) {
       return {

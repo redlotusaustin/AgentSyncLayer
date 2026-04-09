@@ -91,17 +91,17 @@ export async function getActiveAgents(projectHash: string): Promise<AgentStatus[
     agentKeys.push(...keys);
   } while (cursor !== '0' && agentKeys.length < SCAN_MAX_KEYS);
 
-  const statuses = await Promise.all(
-    agentKeys.map(async (key) => {
-      const data = await client.get(key);
-      if (!data) return null;
-      try {
-        return JSON.parse(data) as AgentStatus;
-      } catch {
-        return null;
-      }
-    })
-  );
+  // Batch fetch all agent data in single round-trip
+  const agentDataList = await client.mget(agentKeys);
+
+  const statuses = agentDataList.map((data) => {
+    if (!data) return null;
+    try {
+      return JSON.parse(data) as AgentStatus;
+    } catch {
+      return null;
+    }
+  });
 
   return statuses
     .filter((status): status is AgentStatus => {
@@ -136,8 +136,12 @@ export async function getMyClaims(projectHash: string, agentId: string): Promise
   const claims: Claim[] = [];
   const prefix = `opencode:${projectHash}:claim:`;
 
-  for (const key of claimKeys) {
-    const data = await client.get(key);
+  // Batch fetch all claim data in single round-trip
+  const claimDataList = await client.mget(claimKeys);
+
+  for (let i = 0; i < claimKeys.length; i++) {
+    const key = claimKeys[i];
+    const data = claimDataList[i];
     if (!data) continue;
     try {
       const claim = JSON.parse(data) as Claim;
