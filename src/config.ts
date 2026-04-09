@@ -201,18 +201,13 @@ function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
 
     // Check config first — config at git root should be used.
     // .git only stops upward walk when no config at this level.
-    try {
-      return parseConfig(configPath, dir);
-    } catch (error) {
-      // Check if this is a parse/config error vs "file not found"
-      const message = error instanceof Error ? error.message : String(error);
-      const isFileNotFound = message === 'ENOENT' || message.includes('no such file');
-
-      if (!isFileNotFound) {
-        // Config file exists but has invalid content - warn prominently and continue walking
+    if (fs.existsSync(configPath)) {
+      try {
+        return parseConfig(configPath, dir);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         console.error('[AgentBus] Invalid config in:', configPath, message);
       }
-      // File not found or invalid - continue walking up the tree
     }
 
     // Check if we've hit a git root (only after confirming no config)
@@ -244,12 +239,8 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
     const content = fs.readFileSync(configPath, 'utf-8');
     raw = JSON.parse(content);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const isFileNotFound = message.includes("ENOENT") || message.includes("no such file");
-    if (!isFileNotFound) {
-      console.warn("[AgentBus] Failed to read/parse config file:", configPath, message);
-    }
-    throw new Error("Failed to parse config");
+    console.warn('[AgentBus] Failed to read/parse config file:', configPath, error instanceof Error ? error.message : String(error));
+    throw new Error('Failed to parse config');
   }
 
   // Resolve bus_dir (default: configDir)
