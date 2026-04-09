@@ -8,17 +8,12 @@
  * - Returns on new messages or timeout
  */
 
-import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
-import { validateChannel, validateTimeout, ValidationException } from '../validation';
+import { getRedisClient } from '../redis';
 import { getSessionAgentId } from '../session';
+import type { ListenResponseData, Message, ToolContext, ToolResponse } from '../types';
+import { ValidationException, validateChannel, validateTimeout } from '../validation';
 import { updateLastSeenTimestamp } from './notifications';
-import type {
-  Message,
-  ToolContext,
-  ToolResponse,
-  ListenResponseData,
-} from '../types';
 
 /**
  * Tool arguments for bus_listen
@@ -47,7 +42,7 @@ const POLL_INTERVAL_MS = 500;
  */
 export async function busListenExecute(
   args: BusListenArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<ListenResponseData>> {
   const redis = getRedisClient();
 
@@ -62,9 +57,10 @@ export async function busListenExecute(
 
   try {
     // Validate and normalize channels
-    const channels = args.channels && args.channels.length > 0
-      ? args.channels.map((c) => validateChannel(c))
-      : ['general'];
+    const channels =
+      args.channels && args.channels.length > 0
+        ? args.channels.map((c) => validateChannel(c))
+        : ['general'];
 
     // Validate timeout
     const timeoutSeconds = validateTimeout(args.timeout ?? DEFAULT_TIMEOUT_SECONDS);
@@ -85,15 +81,14 @@ export async function busListenExecute(
       channels.map(async (channel) => {
         const historyKey = `opencode:${projectHash}:history:${channel}`;
         const latest = await client.zrevrange(historyKey, 0, 0);
-        const timestamp = latest.length > 0
-          ? new Date(JSON.parse(latest[0]).timestamp).getTime()
-          : startTime;
+        const timestamp =
+          latest.length > 0 ? new Date(JSON.parse(latest[0]).timestamp).getTime() : startTime;
         return { channel, timestamp };
-      })
+      }),
     );
 
     const timestampMap = new Map<string, number>(
-      latestTimestamps.map((item) => [item.channel, item.timestamp])
+      latestTimestamps.map((item) => [item.channel, item.timestamp]),
     );
 
     // Polling loop
@@ -107,11 +102,7 @@ export async function busListenExecute(
 
         // Get messages with timestamp > sinceTimestamp
         // ZREVRANGEBYSCORE with exclusive min
-        const messages = await client.zrevrangebyscore(
-          historyKey,
-          `(${sinceTimestamp}`,
-          '+inf'
-        );
+        const messages = await client.zrevrangebyscore(historyKey, `(${sinceTimestamp}`, '+inf');
 
         // Parse and filter messages
         for (const msgJson of messages) {
@@ -140,6 +131,7 @@ export async function busListenExecute(
           return bTime - aTime;
         });
         // Mark messages as seen so they do not reappear as unread
+        // Non-critical: notification timestamp is best-effort; failure doesn't affect message delivery
         await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
 
         return {

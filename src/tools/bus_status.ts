@@ -5,15 +5,10 @@
  * 1. SET agent status with EX 60 (60 second TTL)
  */
 
-import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
+import { getRedisClient } from '../redis';
 import { getSessionAgentId } from '../session';
-import type {
-  AgentStatus,
-  ToolContext,
-  ToolResponse,
-  StatusResponseData,
-} from '../types';
+import type { AgentStatus, StatusResponseData, ToolContext, ToolResponse } from '../types';
 
 /**
  * Tool arguments for bus_status
@@ -38,7 +33,7 @@ const STATUS_TTL_SECONDS = 90;
  */
 export async function busStatusExecute(
   args: BusStatusArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<StatusResponseData>> {
   const redis = getRedisClient();
 
@@ -53,7 +48,7 @@ export async function busStatusExecute(
 
   try {
     // Validate task (max 256 chars as per contract)
-    const task = args.task?.trim() ?? "";
+    const task = args.task?.trim() ?? '';
     if (task.length === 0) {
       return {
         ok: false,
@@ -104,6 +99,7 @@ export async function busStatusExecute(
       timestamp: now.toISOString(),
       project: projectHash,
     });
+    // Non-critical: status publish is best-effort; failure doesn't affect status storage
     await client.publish(pubSubChannel, statusMessage).catch(() => {});
 
     return {

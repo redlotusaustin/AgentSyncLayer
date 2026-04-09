@@ -55,7 +55,7 @@ export function validateChannel(name: string): string {
   if (!CHANNEL_PATTERN.test(normalized)) {
     throw new ValidationException(
       'Invalid channel name: must be 1-64 alphanumeric/hyphen/underscore chars',
-      'CHANNEL_INVALID'
+      'CHANNEL_INVALID',
     );
   }
 
@@ -81,7 +81,7 @@ export function validateMessage(text: string): string {
   if (trimmed.length > MAX_MESSAGE_LENGTH) {
     throw new ValidationException(
       `Message too long: max ${MAX_MESSAGE_LENGTH} characters`,
-      'MESSAGE_TOO_LONG'
+      'MESSAGE_TOO_LONG',
     );
   }
 
@@ -108,24 +108,15 @@ export function validateFilePath(path: string): string {
   }
 
   if (normalized.startsWith('/')) {
-    throw new ValidationException(
-      'File path must be relative (no leading slash)',
-      'PATH_INVALID'
-    );
+    throw new ValidationException('File path must be relative (no leading slash)', 'PATH_INVALID');
   }
 
   if (normalized.includes('..')) {
-    throw new ValidationException(
-      "File path cannot contain '..' segments",
-      'PATH_INVALID'
-    );
+    throw new ValidationException("File path cannot contain '..' segments", 'PATH_INVALID');
   }
 
   if (normalized.includes('//')) {
-    throw new ValidationException(
-      'File path cannot contain double slashes',
-      'PATH_INVALID'
-    );
+    throw new ValidationException('File path cannot contain double slashes', 'PATH_INVALID');
   }
 
   return normalized;
@@ -144,7 +135,7 @@ export function validateMessageType(type: string): string {
   if (!validTypes.includes(type)) {
     throw new ValidationException(
       `Invalid message type: must be one of ${validTypes.join(', ')}`,
-      'TYPE_INVALID'
+      'TYPE_INVALID',
     );
   }
 
@@ -210,7 +201,7 @@ export function validateTimeout(timeout: number): number {
   if (!Number.isInteger(timeout) || timeout < 1 || timeout > 30) {
     throw new ValidationException(
       'Invalid timeout: must be an integer between 1 and 30 seconds',
-      'TIMEOUT_INVALID'
+      'TIMEOUT_INVALID',
     );
   }
   return timeout;
@@ -227,7 +218,7 @@ export function validateLimit(limit: number): number {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new ValidationException(
       'Invalid limit: must be an integer between 1 and 100',
-      'LIMIT_INVALID'
+      'LIMIT_INVALID',
     );
   }
   return limit;

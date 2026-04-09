@@ -2,29 +2,34 @@
  * bus_send tool - Publish a message to an AgentBus channel
  *
  * Operations:
- * 1. Publish message to pub/sub channel
- * 2. Add message to sorted set history
- * 3. Prune history to 100 messages (SQLite holds full history)
- * 4. Add channel to active channels set
+ * 1. PUBLISH message to pub/sub channel
+ * 2. ZADD message to sorted set history
+ * 3. ZREMRANGEBYRANK to prune history to 100 messages
+ * 4. SADD channel to active channels set
  */
 
-import * as crypto from 'crypto';
-import { getRedisClient } from '../redis';
-import { resolveProjectHash, resolveDbDir } from '../config';
-import { validateChannel, validateMessage, validateMessageType, ValidationException } from '../validation';
+import * as crypto from 'node:crypto';
+import { resolveDbDir, resolveProjectHash } from '../config';
+import { HISTORY_CAP } from '../lifecycle';
 import { RateLimiter } from '../rate-limiter';
+import { getRedisClient } from '../redis';
 import { getSessionAgentId } from '../session';
 import { getSqliteClient } from '../sqlite';
-import { updateLastSeenTimestamp } from './notifications';
-import { HISTORY_CAP } from '../lifecycle';
 import type {
   Message,
   MessagePayload,
+  MessageType,
+  SendResponseData,
   ToolContext,
   ToolResponse,
-  SendResponseData,
-  MessageType,
 } from '../types';
+import {
+  ValidationException,
+  validateChannel,
+  validateMessage,
+  validateMessageType,
+} from '../validation';
+import { updateLastSeenTimestamp } from './notifications';
 
 // Rate limiter instance (shared across tool calls)
 const rateLimiter = new RateLimiter();
@@ -54,7 +59,7 @@ export interface BusSendArgs {
  */
 export async function busSendExecute(
   args: BusSendArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<SendResponseData>> {
   try {
     // Validate inputs
@@ -150,16 +155,7 @@ export async function busSendExecute(
     // 3. ZREMRANGEBYRANK to prune to 100 messages (keep newest 100)
     pipeline.zremrangebyrank(historyKey, 0, -(HISTORY_CAP + 1));
 
-    // 4. LPUSH to message queue for blocking listeners (BRPOP)
-    const queueKey = `opencode:${projectHash}:queue`;
-    pipeline.lpush(queueKey, messageJson);
-
-    // 5. ZREMRANGEBYRANK to cap queue at 1000 items (keep newest 1000)
-    // Prevents unbounded queue growth from stale BRPOP items
-    const QUEUE_CAP = 1000;
-    pipeline.ltrim(queueKey, 0, QUEUE_CAP - 1);
-
-    // 6. SADD channel to active channels set
+    // 4. SADD channel to active channels set
     const channelsKey = `opencode:${projectHash}:channels`;
     pipeline.sadd(channelsKey, channel);
 
@@ -174,6 +170,7 @@ export async function busSendExecute(
     }
 
     // Also update last-seen timestamp for the sending agent
+    // Non-critical: notification timestamp is best-effort; failure doesn't affect message delivery
     await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
 
     return {

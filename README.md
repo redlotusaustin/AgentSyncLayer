@@ -2,7 +2,7 @@
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.3.0
+Version 0.5.0
 
 ---
 
@@ -39,7 +39,7 @@ When running multiple OpenCode agents on the same project, they operate in isola
 - **Not a task orchestrator** — No automatic task assignment or work stealing
 - **Not a mandatory lock system** — Claims are advisory; agents can ignore them
 - **Not cross-machine** — v1 targets localhost only (same developer, same machine)
-- **Not a persistent archive** — Message history is capped at 500 messages per channel
+- **Not a persistent archive** — Message history is capped at 100 messages per channel
 
 ---
 

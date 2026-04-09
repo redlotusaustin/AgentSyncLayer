@@ -6,16 +6,12 @@
  * 2. Auto-publish release event to "claims" channel
  */
 
-import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
-import { validateFilePath, ValidationException } from '../validation';
-import { getSessionAgentId } from '../session';
 import { publishClaimEvent } from '../lifecycle';
-import type {
-  ToolContext,
-  ToolResponse,
-  ReleaseResponseData,
-} from '../types';
+import { getRedisClient } from '../redis';
+import { getSessionAgentId } from '../session';
+import type { ReleaseResponseData, ToolContext, ToolResponse } from '../types';
+import { ValidationException, validateFilePath } from '../validation';
 
 /**
  * Tool arguments for bus_release
@@ -73,7 +69,7 @@ return 1
  */
 export async function busReleaseExecute(
   args: BusReleaseArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<ReleaseResponseData>> {
   const redis = getRedisClient();
 
@@ -99,12 +95,7 @@ export async function busReleaseExecute(
     const client = redis.getClient();
 
     // Use Lua script for atomic check + delete (handles all cases: not found, not owner, malformed, success)
-    const result = await client.eval(
-      RELEASE_CLAIM_SCRIPT,
-      1,
-      claimKey,
-      agentId
-    ) as number;
+    const result = (await client.eval(RELEASE_CLAIM_SCRIPT, 1, claimKey, agentId)) as number;
 
     switch (result) {
       case 1:
@@ -120,10 +111,18 @@ export async function busReleaseExecute(
         return { ok: false, error: `File '${filePath}' is not claimed`, code: 'CLAIM_NOT_FOUND' };
 
       case -1:
-        return { ok: false, error: `File '${filePath}' is not claimed by this agent`, code: 'CLAIM_NOT_OWNER' };
+        return {
+          ok: false,
+          error: `File '${filePath}' is not claimed by this agent`,
+          code: 'CLAIM_NOT_OWNER',
+        };
 
       default:
-        return { ok: false, error: `Internal error: unexpected release result ${result}`, code: 'INTERNAL_ERROR' };
+        return {
+          ok: false,
+          error: `Internal error: unexpected release result ${result}`,
+          code: 'INTERNAL_ERROR',
+        };
     }
   } catch (error) {
     if (error instanceof ValidationException) {

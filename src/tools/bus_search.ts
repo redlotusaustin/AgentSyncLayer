@@ -16,15 +16,10 @@
  * Fallback: If SQLite is unavailable, returns SQLITE_UNAVAILABLE error.
  */
 
+import { resolveDbDir, resolveProjectHash } from '../config';
 import { getSqliteClient } from '../sqlite';
-import { resolveProjectHash, resolveDbDir } from '../config';
-import { validateChannel, validateLimit, ValidationException } from '../validation';
-import type {
-  ToolContext,
-  ToolResponse,
-  SearchResponseData,
-  SearchResult,
-} from '../types';
+import type { SearchResponseData, SearchResult, ToolContext, ToolResponse } from '../types';
+import { ValidationException, validateChannel, validateLimit } from '../validation';
 
 /**
  * Tool arguments for bus_search.
@@ -63,7 +58,7 @@ const DEFAULT_SEARCH_LIMIT = 20;
  */
 export async function busSearchExecute(
   args: BusSearchArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<SearchResponseData>> {
   const projectHash = resolveProjectHash(context.directory);
 

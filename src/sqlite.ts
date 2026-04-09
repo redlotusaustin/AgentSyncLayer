@@ -25,8 +25,8 @@
  */
 
 import { Database } from 'bun:sqlite';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { Message } from './types';
 
 /**
@@ -37,7 +37,10 @@ export class SqliteInitializationError extends Error {
   /** Error code for this exception type */
   public readonly code = 'SQLITE_UNAVAILABLE';
 
-  constructor(message: string, public readonly originalError?: Error) {
+  constructor(
+    message: string,
+    public readonly originalError?: Error,
+  ) {
     super(message);
     this.name = 'SqliteInitializationError';
   }
@@ -102,7 +105,7 @@ export class SqliteClient {
       this._available = false;
       throw new SqliteInitializationError(
         `Failed to create database directory: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
 
@@ -117,7 +120,7 @@ export class SqliteClient {
       this._available = false;
       throw new SqliteInitializationError(
         `Failed to initialize SQLite at ${this.dbPath}`,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -329,7 +332,7 @@ export class SqliteClient {
       JSON.stringify(msg.payload),
       msg.timestamp,
       msg.project,
-      createdAt
+      createdAt,
     );
     // Only update channel count if this is a new message (not a duplicate)
     // FTS5 is updated automatically via AFTER INSERT trigger
@@ -360,14 +363,14 @@ export class SqliteClient {
 
     // Use cached prepared statement
     const rows = channel
-      ? this.stmtGetMessagesByChannel.all(projectHash, channel, limit, offset) as any[]
-      : this.stmtGetMessagesAll.all(projectHash, limit, offset) as any[];
+      ? (this.stmtGetMessagesByChannel.all(projectHash, channel, limit, offset) as any[])
+      : (this.stmtGetMessagesAll.all(projectHash, limit, offset) as any[]);
     const messages = rows.map(rowToMessage);
 
     // Use cached prepared statement for count
     const countResult = channel
-      ? this.stmtGetMessageCountByChannel.get(projectHash, channel) as { cnt: number }
-      : this.stmtGetMessageCountAll.get(projectHash) as { cnt: number };
+      ? (this.stmtGetMessageCountByChannel.get(projectHash, channel) as { cnt: number })
+      : (this.stmtGetMessageCountAll.get(projectHash) as { cnt: number });
     const cnt = countResult?.cnt ?? 0;
 
     return { messages, total: cnt };
@@ -404,23 +407,23 @@ export class SqliteClient {
     projectHash: string,
     query: string,
     channel?: string | null,
-    limit = 20
+    limit = 20,
   ): Array<{ message: Message; rank: number; snippet: string }> {
     // Sanitize FTS5 query: strip unmatched quotes, escape special chars
     const sanitized = sanitizeFts5Query(query);
 
     // Use cached prepared statement
     const rows = channel
-      ? this.stmtSearchWithChannel.all(sanitized, projectHash, channel, limit) as any[]
-      : this.stmtSearchAllChannels.all(sanitized, projectHash, limit) as any[];
+      ? (this.stmtSearchWithChannel.all(sanitized, projectHash, channel, limit) as any[])
+      : (this.stmtSearchAllChannels.all(sanitized, projectHash, limit) as any[]);
 
-    return rows.map(row => ({
+    return rows.map((row) => ({
       message: rowToMessage(row),
       rank: row.rank,
       snippet: row.snippet,
     }));
   }
-  
+
   /**
    * Get the total message count in the database.
    *
@@ -429,8 +432,8 @@ export class SqliteClient {
    */
   getMessageCount(channel?: string): number {
     const result = channel
-      ? this.stmtGetMessageCountForChannel.get(channel) as { cnt: number }
-      : this.stmtGetAllMessageCount.get() as { cnt: number };
+      ? (this.stmtGetMessageCountForChannel.get(channel) as { cnt: number })
+      : (this.stmtGetAllMessageCount.get() as { cnt: number });
     return result?.cnt ?? 0;
   }
 

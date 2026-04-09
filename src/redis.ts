@@ -38,7 +38,10 @@ export class RedisConnectionError extends Error {
   public readonly code = 'BUS_UNAVAILABLE';
   public readonly isRedisError = true;
 
-  constructor(message: string, public readonly originalError?: Error) {
+  constructor(
+    message: string,
+    public readonly originalError?: Error,
+  ) {
     super(message);
     this.name = 'RedisConnectionError';
   }
@@ -69,8 +72,8 @@ export class RedisClient {
 
   private _connected = false;
   private _state: ConnectionState = 'disconnected';
-  private retryCount = 0;
   private connectionPromise: Promise<void> | null = null;
+  private retryCount = 0;
 
   /**
    * Create a new Redis client wrapper
@@ -80,7 +83,8 @@ export class RedisClient {
    */
   constructor(config?: RedisConfig) {
     // Determine URL: AGENTSYNCLAYER_REDIS_URL env var > config.url > default localhost:6379
-    const redisUrl = process.env.AGENTSYNCLAYER_REDIS_URL ?? config?.url ?? 'redis://localhost:6379';
+    const redisUrl =
+      process.env.AGENTSYNCLAYER_REDIS_URL ?? config?.url ?? 'redis://localhost:6379';
 
     this.maxRetries = config?.maxRetries ?? 3;
     this.retryDelayMs = config?.retryDelayMs ?? 1000;
@@ -338,10 +342,10 @@ export function getRedisClient(config?: RedisConfig): RedisClient {
 /**
  * Set the default Redis client instance
  *
-   * Useful for testing or when you need to share a custom-configured client.
-   *
-   * @param client - The RedisClient instance to use as default
-   */
+ * Useful for testing or when you need to share a custom-configured client.
+ *
+ * @param client - The RedisClient instance to use as default
+ */
 export function setRedisClient(client: RedisClient): void {
   defaultClient = client;
 }
@@ -349,9 +353,9 @@ export function setRedisClient(client: RedisClient): void {
 /**
  * Reset the default Redis client instance
  *
-   * Forces creation of a new client on next getRedisClient() call.
-   * Does not close the existing client.
-   */
+ * Forces creation of a new client on next getRedisClient() call.
+ * Does not close the existing client.
+ */
 export function resetRedisClient(): void {
   defaultClient = null;
 }
@@ -359,12 +363,12 @@ export function resetRedisClient(): void {
 /**
  * Create a Redis client with environment-aware configuration
  *
-   * Helper function that creates a client using AGENTSYNCLAYER_REDIS_URL
-   * if set, or the provided URL otherwise.
+ * Helper function that creates a client using AGENTSYNCLAYER_REDIS_URL
+ * if set, or the provided URL otherwise.
  *
-   * @param url - Fallback URL if AGENTSYNCLAYER_REDIS_URL is not set
-   * @returns A new RedisClient instance
-   */
+ * @param url - Fallback URL if AGENTSYNCLAYER_REDIS_URL is not set
+ * @returns A new RedisClient instance
+ */
 export function createRedisClient(url?: string): RedisClient {
   const config: RedisConfig = {
     url: url ?? 'redis://localhost:6379',

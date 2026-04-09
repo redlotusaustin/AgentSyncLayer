@@ -5,7 +5,7 @@
  */
 
 import { resolveBusConfig } from '../config';
-import type { ToolContext, ToolResponse, BusInfoResponseData } from '../types';
+import type { BusInfoResponseData, ToolContext, ToolResponse } from '../types';
 
 /**
  * Execute bus_info: return bus configuration info
@@ -16,7 +16,7 @@ import type { ToolContext, ToolResponse, BusInfoResponseData } from '../types';
  */
 export async function busInfoExecute(
   _args: Record<string, never>,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<BusInfoResponseData>> {
   try {
     const config = resolveBusConfig(context.directory);

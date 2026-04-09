@@ -12,65 +12,60 @@
  * - Handles session cleanup on idle/end events
  */
 
-import type { Plugin, PluginInput } from "@opencode-ai/plugin";
-import { tool } from "@opencode-ai/plugin";
-import type { ToolContext } from "@opencode-ai/plugin";
+import type { Plugin, PluginInput, ToolContext } from '@opencode-ai/plugin';
+import { tool } from '@opencode-ai/plugin';
 
-import z from "zod";
-
-// Import existing tool implementations
-import {
-  busSendExecute,
-  busReadExecute,
-  busChannelsExecute,
-  busStatusExecute,
-  busAgentsExecute,
-  busInfoExecute,
-  busClaimExecute,
-  busReleaseExecute,
-  busListenExecute,
-  busHistoryExecute,
-  busSearchExecute,
-  cleanupRateLimiter,
-} from "./tools";
-
-// Import types for ToolContext conversion
-import type { ToolContext as AgentBusToolContext } from "./types";
-
+import z from 'zod';
+import { resolveBusConfig } from './config';
 // Import modules for heartbeat and session management
-import { HeartbeatManager } from "./heartbeat";
-import { getSessionAgentId } from "./session";
-import { getRedisClient } from "./redis";
-import { getSqliteClient, closeSqliteClient } from "./sqlite";
-import { resolveBusConfig } from "./config";
-import { getLastSeenTimestamp, buildNotificationText } from "./tools/notifications";
-
+import { HeartbeatManager } from './heartbeat';
 // Import lifecycle helpers
 import {
+  cleanupAgent,
+  formatCompactionContext,
   getActiveAgents,
   getMyClaims,
   getRecentMessages,
-  formatCompactionContext,
-  cleanupAgent,
-} from "./lifecycle";
+} from './lifecycle';
+import { getRedisClient } from './redis';
+import { getSessionAgentId } from './session';
+import { closeSqliteClient, getSqliteClient } from './sqlite';
+// Import existing tool implementations
+import {
+  busAgentsExecute,
+  busChannelsExecute,
+  busClaimExecute,
+  busHistoryExecute,
+  busInfoExecute,
+  busListenExecute,
+  busReadExecute,
+  busReleaseExecute,
+  busSearchExecute,
+  busSendExecute,
+  busStatusExecute,
+  cleanupRateLimiter,
+} from './tools';
+import { buildNotificationText, getLastSeenTimestamp } from './tools/notifications';
+// Import types for ToolContext conversion
+import type { ToolContext as AgentBusToolContext } from './types';
 
 // ============================================================================
 // Bus Usage Instructions (injected into system prompt on every turn)
 // ============================================================================
 
 const BUS_INSTRUCTIONS: string[] = [
-  "## AgentBus — Inter-Agent Communication",
-  "You have access to AgentBus tools for coordinating with other agents in this project.",
-  "",
-  "**When to use the bus:**",
-  "- Before starting a task: use bus_status to announce what you are working on",
-  "- Before editing a file: use bus_claim to lock it (advisory), bus_release when done",
-  "- After completing work: use bus_send to notify other agents of progress or findings",
-  "- When blocked: use bus_send to ask other agents for help or context",
-  "- To check for messages: bus_read (recent), bus_history (deep archive), bus_search (full-text)",
-  "- To discover channels: bus_channels. To see who is active: bus_agents.",
-  "",
-  "Reply to unread message notifications promptly. Use bus_read to get full details.",
+  '## AgentBus — Inter-Agent Communication',
+  'You have access to AgentBus tools for coordinating with other agents in this project.',
+  '',
+  '**When to use the bus:**',
+  '- Before starting a task: use bus_status to announce what you are working on',
+  '- Before editing a file: use bus_claim to lock it (advisory), bus_release when done',
+  '- After completing work: use bus_send to notify other agents of progress or findings',
+  '- When blocked: use bus_send to ask other agents for help or context',
+  '- To check for messages: bus_read (recent), bus_history (deep archive), bus_search (full-text)',
+  '- To discover channels: bus_channels. To see who is active: bus_agents.',
+  '',
+  'Reply to unread message notifications promptly. Use bus_read to get full details.',
 ];
 
 // ============================================================================
@@ -100,11 +95,19 @@ function responseToString(response: unknown): string {
  * bus_send — Publish a message to an AgentBus channel
  */
 const bus_send = tool({
-  description: "Publish a message to an AgentBus channel. Use this to communicate with other agents in the project.",
+  description:
+    'Publish a message to an AgentBus channel. Use this to communicate with other agents in the project.',
   args: {
-    channel: z.string().min(1).max(64).describe("The channel name to publish to (e.g., 'general', 'claims', 'tasks')"),
-    message: z.string().min(1).max(4096).describe("The message text to send"),
-    type: z.enum(["info", "status", "error", "coordination", "claim", "release"]).optional().describe("Message type (default: info)"),
+    channel: z
+      .string()
+      .min(1)
+      .max(64)
+      .describe("The channel name to publish to (e.g., 'general', 'claims', 'tasks')"),
+    message: z.string().min(1).max(4096).describe('The message text to send'),
+    type: z
+      .enum(['info', 'status', 'error', 'coordination', 'claim', 'release'])
+      .optional()
+      .describe('Message type (default: info)'),
   },
   async execute(args, context) {
     const result = await busSendExecute(args, toAgentBusContext(context));
@@ -116,10 +119,17 @@ const bus_send = tool({
  * bus_read — Read recent messages from a channel
  */
 const bus_read = tool({
-  description: "Read recent messages from an AgentBus channel. Returns messages sorted newest first.",
+  description:
+    'Read recent messages from an AgentBus channel. Returns messages sorted newest first.',
   args: {
-    channel: z.string().min(1).max(64).describe("The channel name to read from"),
-    limit: z.number().int().min(1).max(100).optional().describe("Maximum number of messages to return (default: 20)"),
+    channel: z.string().min(1).max(64).describe('The channel name to read from'),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Maximum number of messages to return (default: 20)'),
   },
   async execute(args, context) {
     const result = await busReadExecute(args, toAgentBusContext(context));
@@ -131,7 +141,8 @@ const bus_read = tool({
  * bus_channels — List all active channels
  */
 const bus_channels = tool({
-  description: "List all active channels in the current project. Shows channel names and message counts.",
+  description:
+    'List all active channels in the current project. Shows channel names and message counts.',
   args: {},
   async execute(_args, context) {
     const result = await busChannelsExecute({}, toAgentBusContext(context));
@@ -143,11 +154,15 @@ const bus_channels = tool({
  * bus_status — Update this agent's status
  */
 const bus_status = tool({
-  description: "Update this agent's status for other agents to see. Includes task description, files, and subscribed channels.",
+  description:
+    "Update this agent's status for other agents to see. Includes task description, files, and subscribed channels.",
   args: {
-    task: z.string().min(1).max(256).describe("Current task description (max 256 chars)"),
-    files: z.array(z.string()).optional().describe("List of file paths this agent is working on"),
-    channels: z.array(z.string()).optional().describe("Channels this agent is subscribed to (default: ['general'])"),
+    task: z.string().min(1).max(256).describe('Current task description (max 256 chars)'),
+    files: z.array(z.string()).optional().describe('List of file paths this agent is working on'),
+    channels: z
+      .array(z.string())
+      .optional()
+      .describe("Channels this agent is subscribed to (default: ['general'])"),
   },
   async execute(args, context) {
     const result = await busStatusExecute(args, toAgentBusContext(context));
@@ -159,7 +174,8 @@ const bus_status = tool({
  * bus_agents — List all active agents
  */
 const bus_agents = tool({
-  description: "List all active agents in the current project with their status and subscribed channels.",
+  description:
+    'List all active agents in the current project with their status and subscribed channels.',
   args: {},
   async execute(_args, context) {
     const result = await busAgentsExecute({}, toAgentBusContext(context));
@@ -171,7 +187,8 @@ const bus_agents = tool({
  * bus_info — Get AgentBus configuration info
  */
 const bus_info = tool({
-  description: "Get AgentBus configuration info for the current project. Returns project hash, bus directory, db directory, and config source.",
+  description:
+    'Get AgentBus configuration info for the current project. Returns project hash, bus directory, db directory, and config source.',
   args: {},
   async execute(_args, context) {
     const result = await busInfoExecute({}, toAgentBusContext(context));
@@ -183,9 +200,14 @@ const bus_info = tool({
  * bus_claim — Claim a file for editing
  */
 const bus_claim = tool({
-  description: "Claim a file for editing (advisory lock). Prevents other agents from editing the same file.",
+  description:
+    'Claim a file for editing (advisory lock). Prevents other agents from editing the same file.',
   args: {
-    path: z.string().describe("The file path to claim"),
+    path: z
+      .string()
+      .min(1)
+      .max(512)
+      .describe("The file path to claim (relative, e.g. 'src/auth/login.ts')"),
   },
   async execute(args, context) {
     const result = await busClaimExecute(args, toAgentBusContext(context));
@@ -197,9 +219,12 @@ const bus_claim = tool({
  * bus_release — Release a file claim
  */
 const bus_release = tool({
-  description: "Release a file claim. Must be the owner of the claim to release it.",
+  description: 'Release a file claim. Must be the owner of the claim to release it.',
   args: {
-    path: z.string().describe("The file path to release"),
+    path: z
+      .string()
+      .max(512)
+      .describe("The file path to release (relative, e.g. 'src/auth/login.ts')"),
   },
   async execute(args, context) {
     const result = await busReleaseExecute(args, toAgentBusContext(context));
@@ -211,10 +236,20 @@ const bus_release = tool({
  * bus_listen — Long-poll for new messages
  */
 const bus_listen = tool({
-  description: "Long-poll for new messages on specified channels. Waits for new messages or times out.",
+  description:
+    'Long-poll for new messages on specified channels. Waits for new messages or times out.',
   args: {
-    channels: z.array(z.string()).optional().describe("Channels to listen on (default: ['general'])"),
-    timeout: z.number().int().min(1).max(30).optional().describe("Timeout in seconds (default: 10, max: 30)"),
+    channels: z
+      .array(z.string())
+      .optional()
+      .describe("Channels to listen on (default: ['general'])"),
+    timeout: z
+      .number()
+      .int()
+      .min(1)
+      .max(30)
+      .optional()
+      .describe('Timeout in seconds (default: 10, max: 30)'),
   },
   async execute(args, context) {
     const result = await busListenExecute(args, toAgentBusContext(context));
@@ -226,11 +261,23 @@ const bus_listen = tool({
  * bus_history — Read deep message history from SQLite
  */
 const bus_history = tool({
-  description: "Read deep message history from SQLite. Returns paginated results sorted newest first. Use this to review past coordination or find messages older than what bus_read returns.",
+  description:
+    'Read deep message history from SQLite. Returns paginated results sorted newest first. Use this to review past coordination or find messages older than what bus_read returns.',
   args: {
-    channel: z.string().min(1).max(64).optional().describe("Channel to filter by (omit for all channels)"),
-    page: z.number().int().min(1).optional().describe("Page number (1-indexed, default: 1)"),
-    per_page: z.number().int().min(1).max(100).optional().describe("Messages per page (default: 50)"),
+    channel: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .describe('Channel to filter by (omit for all channels)'),
+    page: z.number().int().min(1).optional().describe('Page number (1-indexed, default: 1)'),
+    per_page: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Messages per page (default: 50)'),
   },
   async execute(args, context) {
     const result = await busHistoryExecute(args, toAgentBusContext(context));
@@ -242,11 +289,17 @@ const bus_history = tool({
  * bus_search — Search message history using full-text search
  */
 const bus_search = tool({
-  description: "Search message history using full-text search. Returns messages matching the query, ranked by relevance.",
+  description:
+    'Search message history using full-text search. Returns messages matching the query, ranked by relevance.',
   args: {
-    query: z.string().min(1).max(256).describe("Search query text"),
-    channel: z.string().min(1).max(64).optional().describe("Channel to filter by (omit for all channels)"),
-    limit: z.number().int().min(1).max(100).optional().describe("Maximum results (default: 20)"),
+    query: z.string().min(1).max(256).describe('Search query text'),
+    channel: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .describe('Channel to filter by (omit for all channels)'),
+    limit: z.number().int().min(1).max(100).optional().describe('Maximum results (default: 20)'),
   },
   async execute(args, context) {
     const result = await busSearchExecute(args, toAgentBusContext(context));
@@ -292,7 +345,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
     await redis.waitForConnection(5000);
     state.connected = true;
   } catch {
-    console.warn("[AgentBus] Redis connection timeout, continuing anyway");
+    console.warn('[AgentBus] Redis connection timeout, continuing anyway');
     state.connected = false;
   }
 
@@ -301,10 +354,10 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
   const heartbeatManager = new HeartbeatManager({
     agentId,
     projectHash,
-    task: "AgentBus active",
+    task: 'AgentBus active',
     files: [],
     claimedFiles: [],
-    channels: ["general"],
+    channels: ['general'],
     startedAt: new Date().toISOString(),
   });
 
@@ -312,7 +365,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
     await heartbeatManager.start();
     state.heartbeatManager = heartbeatManager;
   } catch (error) {
-    console.warn("[AgentBus] Failed to start heartbeat:", error);
+    console.warn('[AgentBus] Failed to start heartbeat:', error);
   }
 
   state.projectHash = projectHash;
@@ -322,7 +375,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
   // Initialize SQLite client (optional, graceful degradation)
   const sqlite = getSqliteClient(dbDir, projectHash);
   if (!sqlite) {
-    console.warn("[AgentBus] SQLite not available, running in Redis-only mode");
+    console.warn('[AgentBus] SQLite not available, running in Redis-only mode');
   }
 
   return {
@@ -341,7 +394,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
     },
 
     // Session compaction hook - inject coordination context
-    "experimental.session.compacting": async (_input, output) => {
+    'experimental.session.compacting': async (_input, output) => {
       if (!state.connected || !state.projectHash) {
         return;
       }
@@ -352,7 +405,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
       const [agents, myClaims, recentMessages] = await Promise.all([
         getActiveAgents(state.projectHash),
         getMyClaims(state.projectHash, agentId),
-        getRecentMessages(state.projectHash, ["general", "claims"], 5, agentId),
+        getRecentMessages(state.projectHash, ['general', 'claims'], 5, agentId),
       ]);
 
       const contextText = formatCompactionContext(agents, myClaims, recentMessages);
@@ -360,7 +413,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
     },
 
     // System transform hook - inject bus instructions + unread notifications
-    "experimental.chat.system.transform": async (_input, output) => {
+    'experimental.chat.system.transform': async (_input, output) => {
       // Always inject bus usage instructions on every turn
       output.system.push(...BUS_INSTRUCTIONS);
 
@@ -402,7 +455,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
 
       // Handle session cleanup events
       // Note: "session.idle" and "session.deleted" are the actual session events in OpenCode SDK
-      if (event.type === "session.idle" || event.type === "session.deleted") {
+      if (event.type === 'session.idle' || event.type === 'session.deleted') {
         // Stop heartbeat
         if (state.heartbeatManager) {
           state.heartbeatManager.stop();

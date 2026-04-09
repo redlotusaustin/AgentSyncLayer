@@ -10,16 +10,13 @@
  * Fallback: If SQLite is unavailable, returns SQLITE_UNAVAILABLE error.
  * Pagination: Uses page number (1-indexed) and per_page count.
  */
-import { getSqliteClient } from '../sqlite';
-import { resolveProjectHash, resolveDbDir } from '../config';
-import { validateChannel, validateLimit, ValidationException } from '../validation';
+
+import { resolveDbDir, resolveProjectHash } from '../config';
 import { getSessionAgentId } from '../session';
+import { getSqliteClient } from '../sqlite';
+import type { HistoryResponseData, ToolContext, ToolResponse } from '../types';
+import { ValidationException, validateChannel, validateLimit } from '../validation';
 import { updateLastSeenTimestamp } from './notifications';
-import type {
-  ToolContext,
-  ToolResponse,
-  HistoryResponseData,
-} from '../types';
 
 /**
  * Tool arguments for bus_history.
@@ -59,7 +56,7 @@ const DEFAULT_PER_PAGE = 50;
  */
 export async function busHistoryExecute(
   args: BusHistoryArgs,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<ToolResponse<HistoryResponseData>> {
   const projectHash = resolveProjectHash(context.directory);
 
@@ -92,6 +89,7 @@ export async function busHistoryExecute(
 
     // Update last-seen timestamp (fire-and-forget)
     const agentId = getSessionAgentId();
+    // Non-critical: notification timestamp is best-effort; failure doesn't affect message delivery
     await updateLastSeenTimestamp(projectHash, agentId).catch(() => {});
 
     return {

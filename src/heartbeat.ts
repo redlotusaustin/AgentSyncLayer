@@ -212,4 +212,3 @@ export class HeartbeatManager {
     return STATUS_TTL_SECONDS;
   }
 }
-

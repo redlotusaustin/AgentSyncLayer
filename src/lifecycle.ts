@@ -6,7 +6,7 @@
  * rather than reading from global state, making them reusable and testable.
  */
 
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { getRedisClient } from './redis';
 import type { AgentStatus, Claim, Message } from './types';
 
@@ -38,7 +38,7 @@ export async function publishClaimEvent(
   projectHash: string,
   agentId: string,
   filePath: string,
-  eventType: 'claim' | 'release'
+  eventType: 'claim' | 'release',
 ): Promise<void> {
   const messageObj = {
     id: `evt-${crypto.randomUUID()}`,
@@ -58,7 +58,11 @@ export async function publishClaimEvent(
   const pipeline = client.pipeline();
   pipeline.publish(`opencode:${projectHash}:ch:${CLAIMS_CHANNEL}`, messageJson);
   pipeline.zadd(`opencode:${projectHash}:history:${CLAIMS_CHANNEL}`, Date.now(), messageJson);
-  pipeline.zremrangebyrank(`opencode:${projectHash}:history:${CLAIMS_CHANNEL}`, 0, -(HISTORY_CAP + 1));
+  pipeline.zremrangebyrank(
+    `opencode:${projectHash}:history:${CLAIMS_CHANNEL}`,
+    0,
+    -(HISTORY_CAP + 1),
+  );
   pipeline.sadd(`opencode:${projectHash}:channels`, CLAIMS_CHANNEL);
   await pipeline.exec();
 }
@@ -80,7 +84,13 @@ export async function getActiveAgents(projectHash: string): Promise<AgentStatus[
   let cursor = '0';
 
   do {
-    const [nextCursor, keys] = await client.scan(cursor, 'MATCH', agentPattern, 'COUNT', SCAN_BATCH_SIZE);
+    const [nextCursor, keys] = await client.scan(
+      cursor,
+      'MATCH',
+      agentPattern,
+      'COUNT',
+      SCAN_BATCH_SIZE,
+    );
     cursor = nextCursor;
     agentKeys.push(...keys);
   } while (cursor !== '0' && agentKeys.length < SCAN_MAX_KEYS);
@@ -122,7 +132,13 @@ export async function getMyClaims(projectHash: string, agentId: string): Promise
   let cursor = '0';
 
   do {
-    const [nextCursor, keys] = await client.scan(cursor, 'MATCH', claimPattern, 'COUNT', SCAN_BATCH_SIZE);
+    const [nextCursor, keys] = await client.scan(
+      cursor,
+      'MATCH',
+      claimPattern,
+      'COUNT',
+      SCAN_BATCH_SIZE,
+    );
     cursor = nextCursor;
     claimKeys.push(...keys);
   } while (cursor !== '0' && claimKeys.length < SCAN_MAX_KEYS);
@@ -167,7 +183,7 @@ export async function getRecentMessages(
   projectHash: string,
   channels: string[],
   limit = 5,
-  agentId?: string
+  agentId?: string,
 ): Promise<Message[]> {
   const redis = getRedisClient();
   const client = redis.getClient();
@@ -191,7 +207,9 @@ export async function getRecentMessages(
     }
   }
 
-  return allMessages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return allMessages.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+  );
 }
 
 /**
@@ -210,7 +228,7 @@ export async function getRecentMessages(
 export function formatCompactionContext(
   agents: AgentStatus[],
   myClaims: Claim[],
-  recentMessages: Message[]
+  recentMessages: Message[],
 ): string {
   const lines: string[] = [];
   lines.push('## ASL — Active Coordination State');
@@ -271,7 +289,13 @@ export async function cleanupAgent(projectHash: string, agentId: string): Promis
     let keysScanned = 0;
 
     do {
-      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', claimPattern, 'COUNT', SCAN_BATCH_SIZE);
+      const [nextCursor, keys] = await client.scan(
+        cursor,
+        'MATCH',
+        claimPattern,
+        'COUNT',
+        SCAN_BATCH_SIZE,
+      );
       cursor = nextCursor;
       keysScanned += keys.length;
 
