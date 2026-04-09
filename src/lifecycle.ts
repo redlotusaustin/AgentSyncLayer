@@ -268,10 +268,12 @@ export async function cleanupAgent(projectHash: string, agentId: string): Promis
     // Release all claims held by this agent
     const claimPattern = `opencode:${projectHash}:claim:*`;
     let cursor = '0';
+    let keysScanned = 0;
 
     do {
       const [nextCursor, keys] = await client.scan(cursor, 'MATCH', claimPattern, 'COUNT', SCAN_BATCH_SIZE);
       cursor = nextCursor;
+      keysScanned += keys.length;
 
       for (const key of keys) {
         const data = await client.get(key);
@@ -287,7 +289,7 @@ export async function cleanupAgent(projectHash: string, agentId: string): Promis
           }
         }
       }
-    } while (cursor !== '0');
+    } while (cursor !== '0' && keysScanned < SCAN_MAX_KEYS);
   } catch (error) {
     console.warn('[AgentBus] Cleanup error:', error);
   }

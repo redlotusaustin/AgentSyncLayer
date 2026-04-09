@@ -66,6 +66,8 @@ export class RedisClient {
   private readonly client: Redis;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
+  /** Resolved Redis URL (env var > config.url > default) - used by both main and blocking clients */
+  private readonly url: string;
 
   private _connected = false;
   private _state: ConnectionState = 'disconnected';
@@ -79,11 +81,11 @@ export class RedisClient {
   private blockingClient: Redis | null = null;
 
   constructor(config?: RedisConfig) {
-    const redisUrl = process.env.AGENTBUS_REDIS_URL ?? config?.url ?? 'redis://localhost:6379';
+    this.url = process.env.AGENTBUS_REDIS_URL ?? config?.url ?? 'redis://localhost:6379';
     this.maxRetries = config?.maxRetries ?? 3;
     this.retryDelayMs = config?.retryDelayMs ?? 1000;
 
-    this.client = new Redis(redisUrl, {
+    this.client = new Redis(this.url, {
       maxRetriesPerRequest: this.maxRetries,
       retryStrategy: (times: number) => (times > this.maxRetries ? null : this.retryDelayMs),
       enableOfflineQueue: true,
@@ -114,8 +116,14 @@ export class RedisClient {
    */
   getBlockingClient(): Redis {
     if (!this.blockingClient) {
-      const redisUrl = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
-      this.blockingClient = new Redis(redisUrl, this.clientOptions);
+      this.blockingClient = new Redis(this.url, this.clientOptions);
+      // Handle errors and close events to allow reconnection on next call
+      this.blockingClient.on('error', (err: Error) => {
+        console.error('[Redis] Blocking client error:', err.message);
+      });
+      this.blockingClient.on('close', () => {
+        this.blockingClient = null;
+      });
     }
     return this.blockingClient;
   }

@@ -166,7 +166,11 @@ export async function busSendExecute(
     // Execute pipeline
     const results = await pipeline.exec();
     if (results?.some(([err]) => err)) {
-      console.warn('[bus_send] Redis pipeline had errors:', results.filter(([err]) => err));
+      const errors = results.filter(([err]) => err);
+      console.warn('[bus_send] Redis pipeline had errors:', errors);
+      // Redis is ephemeral (fast-path); SQLite is source of truth for durability.
+      // ZADD failure at index 1 means message won't be readable via bus_history,
+      // but the message is still stored in SQLite and available via bus_read.
     }
 
     // Also update last-seen timestamp for the sending agent
