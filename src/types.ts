@@ -83,6 +83,7 @@ export type ErrorCode =
   | 'CHANNEL_INVALID'
   | 'CLAIM_CONFLICT'
   | 'CLAIM_NOT_FOUND'
+  | 'CLAIM_NOT_OWNER'
   | 'PATH_INVALID'
   | 'QUERY_INVALID'
   | 'RATE_LIMITED'

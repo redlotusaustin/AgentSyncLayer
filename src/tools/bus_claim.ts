@@ -125,6 +125,13 @@ return {0, existing}
 `;
 
 /**
+ * Arguments for bus_claim tool
+ */
+export interface BusClaimArgs {
+  path: string;
+}
+
+/**
  * Execute bus_claim: claim a file for editing
  *
  * @param args - Tool arguments (path)

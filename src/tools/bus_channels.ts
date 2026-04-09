@@ -66,7 +66,7 @@ export async function busChannelsExecute(
 
     const channelInfos: ChannelInfo[] = channelNames.map((name, index) => ({
       name,
-      messages: pipelineResults?.[index]?.[1] ?? 0,
+      messages: Number(pipelineResults?.[index]?.[1] ?? 0),
     }));
 
     // Sort by name for consistent output
