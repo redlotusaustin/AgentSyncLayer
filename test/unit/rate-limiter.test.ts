@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach } from 'bun:test';
-import { RateLimiter, createRateLimiter, createRateLimitResponse } from '../../src/rate-limiter';
+import { RateLimiter } from '../../src/rate-limiter';
 import { RateLimitException } from '../../src/validation';
 
 describe('RateLimiter', () => {
@@ -219,26 +219,3 @@ describe('RateLimiter', () => {
   });
 });
 
-describe('createRateLimiter', () => {
-  test('creates limiter with default settings', () => {
-    const limiter = createRateLimiter();
-    expect(limiter.getMaxPerSecond()).toBe(10);
-  });
-});
-
-describe('createRateLimitResponse', () => {
-  test('creates error response without retry info', () => {
-    const response = createRateLimitResponse();
-    expect(response.ok).toBe(false);
-    expect(response.code).toBe('RATE_LIMITED');
-    expect(response.error).toContain('10 messages per second');
-    expect(response.error).not.toContain('Retry after');
-  });
-
-  test('creates error response with retry info', () => {
-    const response = createRateLimitResponse(500);
-    expect(response.ok).toBe(false);
-    expect(response.code).toBe('RATE_LIMITED');
-    expect(response.error).toContain('Retry after 500ms');
-  });
-});

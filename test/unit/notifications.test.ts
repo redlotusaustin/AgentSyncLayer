@@ -127,8 +127,9 @@ describe('notifications', () => {
       } finally {
         // Reconnect for subsequent tests
         // Create a fresh client
-        const { createRedisClient } = await import('../../src/redis');
-        const newClient = createRedisClient();
+        const { RedisClient } = await import('../../src/redis');
+        const redisUrl = process.env.AGENTBUS_REDIS_URL ?? 'redis://localhost:6379';
+        const newClient = new RedisClient({ url: redisUrl });
         setRedisClient(newClient);
       }
     });

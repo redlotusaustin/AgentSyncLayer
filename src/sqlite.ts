@@ -76,7 +76,7 @@ export interface MessagesSinceOptions {
  * Provides message storage, retrieval, and search capabilities.
  *
  * @example
- * const client = new SqliteClient('/path/to/project', 'a1b2c3d4e5f6');
+ * const client = new SqliteClient('/path/to/project');
  * client.insertMessage(message);
  * const { messages, total } = client.getMessages({ projectHash, limit: 50, offset: 0 });
  * client.close();
@@ -90,10 +90,9 @@ export class SqliteClient {
    * Create a new SQLite client for a project.
    *
    * @param directory - The project directory path (used for .agentbus/ subdirectory)
-   * @param _projectHash - 12-character project hash (unused but kept for API parity)
    * @throws {SqliteInitializationError} If the database directory cannot be created or the database cannot be opened
    */
-  constructor(directory: string, _projectHash: string) {
+  constructor(directory: string) {
     let dbDir: string;
     try {
       dbDir = path.join(directory, '.agentbus');
@@ -518,21 +517,20 @@ const clientMap = new Map<string, SqliteClient>();
  * Creates a new client if one doesn't exist, or returns null if initialization fails.
  *
  * @param directory - The project directory path
- * @param projectHash - 12-character project hash (for future use, currently unused)
  * @returns SqliteClient instance if successful, null if initialization failed
  *
  * @example
- * const sqlite = getSqliteClient('/path/to/project', 'a1b2c3d4e5f6');
+ * const sqlite = getSqliteClient('/path/to/project');
  * if (sqlite) {
  *   const messages = sqlite.getMessages({ projectHash, limit: 50, offset: 0 });
  * }
  */
-export function getSqliteClient(directory: string, projectHash: string): SqliteClient | null {
+export function getSqliteClient(directory: string): SqliteClient | null {
   const cached = clientMap.get(directory);
   if (cached) return cached;
 
   try {
-    const client = new SqliteClient(directory, projectHash);
+    const client = new SqliteClient(directory);
     clientMap.set(directory, client);
     return client;
   } catch (error) {

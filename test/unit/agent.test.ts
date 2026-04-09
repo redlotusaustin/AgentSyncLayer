@@ -3,13 +3,8 @@ import {
   generateAgentId,
   composeAgentId,
   parseAgentId,
-  isValidAgentId,
-  extractHostname,
-  extractPid,
-  extractRandomSuffix,
-  isSameHostname,
-  shortenAgentId,
 } from '../../src/agent';
+import { isValidAgentId } from '../../src/validation';
 
 describe('generateAgentId', () => {
   test('generates valid agent ID', () => {
@@ -103,74 +98,5 @@ describe('isValidAgentId', () => {
     expect(isValidAgentId('devbox-1234-abc')).toBe(false); // random too short
     expect(isValidAgentId('devbox-1234-abcde')).toBe(false); // random too long
     expect(isValidAgentId('')).toBe(false);
-  });
-});
-
-describe('extractHostname', () => {
-  test('extracts hostname from valid ID', () => {
-    expect(extractHostname('devbox-48201-a7f2')).toBe('devbox');
-    expect(extractHostname('my.host-12345-abcd')).toBe('my.host');
-  });
-
-  test('returns null for invalid ID', () => {
-    expect(extractHostname('invalid')).toBeNull();
-  });
-});
-
-describe('extractPid', () => {
-  test('extracts PID from valid ID', () => {
-    expect(extractPid('devbox-48201-a7f2')).toBe(48201);
-    expect(extractPid('host-1-abcd')).toBe(1);
-  });
-
-  test('returns null for invalid ID', () => {
-    expect(extractPid('invalid')).toBeNull();
-  });
-});
-
-describe('extractRandomSuffix', () => {
-  test('extracts random suffix from valid ID', () => {
-    expect(extractRandomSuffix('devbox-48201-a7f2')).toBe('a7f2');
-    expect(extractRandomSuffix('host-1-abcd')).toBe('abcd');
-  });
-
-  test('returns null for invalid ID', () => {
-    expect(extractRandomSuffix('invalid')).toBeNull();
-  });
-});
-
-describe('isSameHostname', () => {
-  test('detects same hostname', () => {
-    expect(isSameHostname('devbox-48201-a7f2', 'devbox-49102-b3c4')).toBe(true);
-  });
-
-  test('detects different hostnames', () => {
-    expect(isSameHostname('devbox-48201-a7f2', 'laptop-49102-b3c4')).toBe(false);
-  });
-
-  test('handles invalid IDs', () => {
-    expect(isSameHostname('invalid', 'devbox-48201-a7f2')).toBe(false);
-    expect(isSameHostname('devbox-48201-a7f2', 'invalid')).toBe(false);
-  });
-});
-
-describe('shortenAgentId', () => {
-  test('returns full ID if under max length', () => {
-    const id = 'devbox-48201-a7f2';
-    expect(shortenAgentId(id, 20)).toBe(id);
-  });
-
-  test('shortens long hostnames', () => {
-    const id = 'this-is-a-very-long-hostname-48201-a7f2';
-    const shortened = shortenAgentId(id, 20);
-    expect(shortened.length).toBeLessThanOrEqual(20);
-    expect(shortened).toContain('...');
-    expect(shortened).toMatch(/-48201-a7f2$/); // ends with pid and random
-  });
-
-  test('handles maxLength smaller than suffix', () => {
-    const id = 'devbox-48201-a7f2';
-    const shortened = shortenAgentId(id, 10);
-    expect(shortened.length).toBeLessThanOrEqual(10);
   });
 });

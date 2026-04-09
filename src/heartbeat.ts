@@ -213,24 +213,3 @@ export class HeartbeatManager {
   }
 }
 
-/**
- * Create a heartbeat manager with current agent state
- *
- * Factory function to create and optionally start a heartbeat manager.
- *
- * @param state - Agent state
- * @param autoStart - If true, starts heartbeat immediately (default: false)
- * @returns The created HeartbeatManager
- */
-export async function createHeartbeatManager(
-  state: HeartbeatState,
-  autoStart = false
-): Promise<HeartbeatManager> {
-  const manager = new HeartbeatManager(state);
-
-  if (autoStart) {
-    await manager.start();
-  }
-
-  return manager;
-}

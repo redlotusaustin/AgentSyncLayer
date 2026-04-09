@@ -356,18 +356,3 @@ export function resetRedisClient(): void {
   defaultClient = null;
 }
 
-/**
- * Create a Redis client with environment-aware configuration
- *
-   * Helper function that creates a client using AGENTBUS_REDIS_URL
-   * if set, or the provided URL otherwise.
- *
-   * @param url - Fallback URL if AGENTBUS_REDIS_URL is not set
-   * @returns A new RedisClient instance
-   */
-export function createRedisClient(url?: string): RedisClient {
-  const config: RedisConfig = {
-    url: url ?? 'redis://localhost:6379',
-  };
-  return new RedisClient(config);
-}

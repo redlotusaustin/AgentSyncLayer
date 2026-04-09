@@ -73,9 +73,8 @@ describe('T1.2: idempotent initialization', () => {
   afterAll(cleanup);
 
   test('getSqliteClient returns same instance for same directory', () => {
-    const projectHash = 'a1b2c3d4e5f6';
-    const client1 = getSqliteClient(dir, projectHash);
-    const client2 = getSqliteClient(dir, projectHash);
+    const client1 = getSqliteClient(dir);
+    const client2 = getSqliteClient(dir);
 
     expect(client1).toBe(client2);
     expect(client1).not.toBeNull();
@@ -90,7 +89,7 @@ describe('T1.3: insertMessage persists message', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
   });
   afterAll(cleanup);
 
@@ -115,7 +114,7 @@ describe('T1.4: insertMessage ignores duplicate IDs', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
   });
   afterAll(cleanup);
 
@@ -135,7 +134,7 @@ describe('T1.5: insertMessage upserts channel count', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
   });
   afterAll(cleanup);
 
@@ -155,7 +154,7 @@ describe('T1.6: getMessages with channel filter', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     // Insert 5 messages to channel A, 3 to channel B
     for (let i = 0; i < 5; i++) {
       client.insertMessage(createTestMessage({ channel: 'channel-a', id: `msg-a-${i}` }));
@@ -186,7 +185,7 @@ describe('T1.7: getMessages pagination', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     // Insert 100 messages with decreasing timestamps
     for (let i = 0; i < 100; i++) {
       const timestamp = new Date(Date.now() - (100 - i) * 1000).toISOString();
@@ -214,7 +213,7 @@ describe('T1.8: getMessages total count accuracy', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     // Insert 25 messages
     for (let i = 0; i < 25; i++) {
       client.insertMessage(createTestMessage({ id: `msg-total-${i}` }));
@@ -235,7 +234,7 @@ describe('T1.9: getMessagesSince returns only newer messages', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     // Insert messages at baseTime, baseTime+1000, baseTime+2000
     // Store baseTime for use in test
     (globalThis as any).__testBaseTime = Date.now();
@@ -266,7 +265,7 @@ describe('T1.10: getMessagesSince with limit', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     // Insert 100 messages
     for (let i = 0; i < 100; i++) {
       client.insertMessage(createTestMessage({ id: `msg-limit-${i}` }));
@@ -287,7 +286,7 @@ describe('T1.11: searchMessages finds matching text', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     client.insertMessage(createTestMessage({
       id: 'msg-search-1',
       payload: { text: 'implement authentication' },
@@ -312,7 +311,7 @@ describe('T1.12: searchMessages with channel filter', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     client.insertMessage(createTestMessage({
       id: 'msg-ch-filter-1',
       channel: 'general',
@@ -339,7 +338,7 @@ describe('T1.13: searchMessages returns snippet', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     client.insertMessage(createTestMessage({
       id: 'msg-snippet-1',
       payload: { text: 'this is a test message with matching text inside' },
@@ -361,7 +360,7 @@ describe('T1.14: searchMessages ranks by relevance', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     client.insertMessage(createTestMessage({
       id: 'msg-rank-1',
       payload: { text: 'error handling error recovery' }, // 2 occurrences
@@ -388,7 +387,7 @@ describe('T1.15: searchMessages sanitizes FTS5 query', () => {
   const projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
-    client = new SqliteClient(dir, projectHash);
+    client = new SqliteClient(dir);
     client.insertMessage(createTestMessage({
       id: 'msg-sanitize',
       payload: { text: 'this is a normal test message' },
@@ -409,7 +408,7 @@ describe('T1.16: close sets available to false', () => {
   let client: SqliteClient;
 
   beforeAll(() => {
-    client = new SqliteClient(dir, 'a1b2c3d4e5f6');
+    client = new SqliteClient(dir);
   });
   afterAll(cleanup);
 
@@ -427,7 +426,7 @@ describe('T1.17: constructor fails gracefully on invalid path', () => {
   test('throws SqliteInitializationError on invalid path', () => {
     expect(() => {
       // Use a path that cannot be created
-      new SqliteClient('/root/impossible/path', 'a1b2c3d4e5f6');
+      new SqliteClient('/root/impossible/path');
     }).toThrow(SqliteInitializationError);
   });
 });
@@ -435,7 +434,7 @@ describe('T1.17: constructor fails gracefully on invalid path', () => {
 describe('T1.18: getSqliteClient returns null on failure', () => {
   test('returns null when constructor throws', () => {
     // Mock behavior: using an impossible path should result in null
-    const result = getSqliteClient('/root/impossible/path', 'a1b2c3d4e5f6');
+    const result = getSqliteClient('/root/impossible/path');
     expect(result).toBeNull();
   });
 });
