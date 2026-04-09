@@ -58,7 +58,7 @@ import {
 // Bus Usage Instructions (injected into system prompt on every turn)
 // ============================================================================
 
-const BUS_INSTRUCTIONS: string[] = [
+let BUS_INSTRUCTIONS: string[] = [
   "## AgentBus — Inter-Agent Communication",
   "You have access to AgentBus tools for coordinating with other agents in this project.",
   "",
@@ -287,8 +287,12 @@ export const AgentBusPlugin: Plugin = async (input: PluginInput) => {
   const dbDir = busConfig.db_dir;
   const agentId = getSessionAgentId(); // Same ID as tools use!
 
-  if (busConfig.source !== "default") {
-    console.log(`[AgentBus] Bus: ${projectHash} (source: ${busConfig.source}, bus_dir: ${busConfig.bus_dir}, db_dir: ${busConfig.db_dir})`);
+  // Build system instructions with bus identity (visible in context, not console)
+  const busIdentity = busConfig.source !== "default"
+    ? `**Bus identity:** ${busConfig.source} (hash: ${projectHash}, config: ${busConfig.configPath ?? "env var"})`
+    : null;
+  if (busIdentity) {
+    BUS_INSTRUCTIONS = [busIdentity, "", ...BUS_INSTRUCTIONS];
   }
 
   // Wait for Redis connection (max 5 seconds)
