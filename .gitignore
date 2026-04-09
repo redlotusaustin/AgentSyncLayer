@@ -1,3 +1,20 @@
-node_modules\n*.db\n.agentbus/
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Bun
+.bun/
+
+# macOS
+.DS_Store
+
+# SQLite databases
+*.db
+
+# Environment variables
+.env
+
 # AgentBus runtime data
-.agentbus/
+.agentsynclayer/

@@ -2,7 +2,7 @@
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.3.0
+Version 0.5.0
 
 ---
 
@@ -116,7 +116,10 @@ redis-cli ping
 ### 2. Install AgentBus
 
 ```bash
-# Install dependencies
+# Install via npm (published as 'agentbus')
+npm install agentbus
+
+# Or install from source
 bun install
 
 # Verify TypeScript compiles
@@ -794,32 +797,33 @@ The `source` field shows how the bus was resolved:
 agentbus/
 ├── src/
 │   ├── index.ts           # Plugin entry point
+│   ├── adapter.ts         # OpenCode plugin adapter (tool definitions)
 │   ├── agent.ts           # Agent ID generation
-│   ├── heartbeat.ts       # Agent presence heartbeat
+│   ├── heartbeat.ts       # Agent presence heartbeat (30s interval, 90s TTL)
 │   ├── namespace.ts       # Project hash & key building
-│   ├── rate-limiter.ts    # Message rate limiting
-│   ├── redis.ts           # Redis client wrapper
+│   ├── rate-limiter.ts    # Message rate limiting (10 msg/sec)
+│   ├── redis.ts           # Redis client wrapper with connection management
+│   ├── sqlite.ts          # SQLite client with FTS5 full-text search
 │   ├── session.ts         # Session agent ID management
-│   ├── sqlite.ts          # SQLite client with FTS5
-│   ├── types.ts           # TypeScript type definitions
-│   ├── validation.ts      # Input validation
-│   ├── adapter.ts         # OpenCode plugin adapter
-│   ├── lifecycle.ts       # Shared helpers for hooks
-│   ├── config.ts          # Bus config resolution (.agentbus.json, env vars)
+│   ├── lifecycle.ts       # Shared helpers for hooks and cleanup
+│   ├── config.ts         # Bus config resolution (.agentbus.json, env vars)
+│   ├── types.ts          # TypeScript type definitions
+│   ├── validation.ts     # Input validation
 │   └── tools/
 │       ├── index.ts       # Tool exports
-│       ├── bus_send.ts    # Publish message (dual-write)
-│       ├── bus_read.ts    # Read messages (SQLite fallback)
+│       ├── bus_send.ts     # Publish message (dual-write)
+│       ├── bus_read.ts     # Read messages (Redis + SQLite)
 │       ├── bus_channels.ts # List channels
-│       ├── bus_status.ts  # Update status
-│       ├── bus_agents.ts  # List agents
+│       ├── bus_status.ts  # Update agent status
+│       ├── bus_agents.ts  # List active agents
 │       ├── bus_info.ts    # Bus configuration info
-│       ├── bus_claim.ts   # Claim file
-│       ├── bus_release.ts  # Release claim
+│       ├── bus_claim.ts   # Claim file (advisory lock)
+│       ├── bus_release.ts # Release claim
 │       ├── bus_listen.ts  # Long-poll messages
 │       ├── bus_history.ts # Paginated history (SQLite)
 │       ├── bus_search.ts  # Full-text search (FTS5)
 │       └── notifications.ts # Last-seen timestamp tracking
+├── bus-monitor.ts         # CLI for inspecting and tailing bus state
 └── test/
     ├── helpers.ts
     ├── fixtures.ts
@@ -878,7 +882,7 @@ MIT
 
 ## Related Documents
 
-- [PRD](./PRD.md) — Product Requirements Document
-- [RFC](./RFC.md) — Architecture and design decisions
-- [Contract](./contract.md) — Tool interfaces, schemas, and key formats
-- [Tests](./tests.md) — Test scenarios
+- [PRD](../build_docs/0.1.0-init/PRD.md) — Product Requirements Document
+- [RFC](../build_docs/0.1.0-init/RFC.md) — Architecture and design decisions
+- [Contract](../build_docs/0.1.0-init/contract.md) — Tool interfaces, schemas, and key formats
+- [Tests](../build_docs/0.1.0-init/tests.md) — Test scenarios

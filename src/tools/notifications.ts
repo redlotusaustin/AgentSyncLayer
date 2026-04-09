@@ -14,7 +14,7 @@
  */
 
 import { getRedisClient } from '../redis';
-import { KeyBuilder } from '../namespace';
+import { getSessionAgentId } from '../session';
 import type { Message } from '../types';
 
 /** TTL for last-seen keys in seconds (24 hours) */
@@ -35,8 +35,7 @@ const LAST_SEEN_TTL_SECONDS = 86400;
  * // Returns: 'opencode:a1b2c3d4e5f6:lastseen:devbox-48201-a7f2'
  */
 export function buildLastSeenKey(projectHash: string, agentId: string): string {
-  const builder = new KeyBuilder(projectHash);
-  return builder.lastseen(agentId);
+  return `opencode:${projectHash}:lastseen:${agentId}`;
 }
 
 /**
@@ -92,9 +91,6 @@ export async function updateLastSeenTimestamp(
   if (!redis.checkConnection()) {
     return;
   }
-
-  // Import here to avoid circular dependency
-  const { getSessionAgentId } = await import('../session');
 
   const id = agentId ?? getSessionAgentId();
   const key = buildLastSeenKey(projectHash, id);

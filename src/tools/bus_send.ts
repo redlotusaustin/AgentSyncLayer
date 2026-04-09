@@ -16,6 +16,7 @@ import { RateLimiter } from '../rate-limiter';
 import { getSessionAgentId } from '../session';
 import { getSqliteClient } from '../sqlite';
 import { updateLastSeenTimestamp } from './notifications';
+import { HISTORY_CAP } from '../lifecycle';
 import type {
   Message,
   MessagePayload,
@@ -98,7 +99,7 @@ export async function busSendExecute(
 
     // --- Phase 1: Durable write to SQLite (BEFORE Redis check per RFC degradation table) ---
     let sqliteWriteSucceeded = false;
-    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
+    const sqlite = getSqliteClient(resolveDbDir(context.directory));
     if (sqlite) {
       try {
         sqlite.insertMessage(messageObj);
@@ -146,18 +147,30 @@ export async function busSendExecute(
     const timestampMs = Date.now();
     pipeline.zadd(historyKey, timestampMs, messageJson);
 
-    // 3. ZREMRANGEBYRANK to prune to 500 messages (keep newest 500)
-    pipeline.zremrangebyrank(historyKey, 0, -101);
+    // 3. ZREMRANGEBYRANK to prune to 100 messages (keep newest 100)
+    pipeline.zremrangebyrank(historyKey, 0, -(HISTORY_CAP + 1));
 
-    // 4. SADD channel to active channels set
+    // 4. LPUSH to message queue for blocking listeners (BRPOP)
+    const queueKey = `opencode:${projectHash}:queue`;
+    pipeline.lpush(queueKey, messageJson);
+
+    // 5. ZREMRANGEBYRANK to cap queue at 1000 items (keep newest 1000)
+    // Prevents unbounded queue growth from stale BRPOP items
+    const QUEUE_CAP = 1000;
+    pipeline.ltrim(queueKey, 0, QUEUE_CAP - 1);
+
+    // 6. SADD channel to active channels set
     const channelsKey = `opencode:${projectHash}:channels`;
     pipeline.sadd(channelsKey, channel);
 
     // Execute pipeline
     const results = await pipeline.exec();
-    const pipelineErrors = results?.filter(([err]) => err !== null);
-    if (pipelineErrors && pipelineErrors.length > 0) {
-      console.warn('[bus_send] Redis pipeline had errors:', pipelineErrors);
+    if (results?.some(([err]) => err)) {
+      const errors = results.filter(([err]) => err);
+      console.warn('[bus_send] Redis pipeline had errors:', errors);
+      // Redis is ephemeral (fast-path); SQLite is source of truth for durability.
+      // ZADD failure at index 1 means message won't be readable via bus_history,
+      // but the message is still stored in SQLite and available via bus_read.
     }
 
     // Also update last-seen timestamp for the sending agent

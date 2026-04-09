@@ -1,15 +1,18 @@
 /**
  * AgentBus Tools - Export all tool implementations
  *
- * This module exports all 10 bus tools for easy importing:
+ * This module exports all 11 bus tools for easy importing:
  * - bus_send: Publish a message to a channel
  * - bus_read: Read recent messages from a channel
  * - bus_channels: List active channels
  * - bus_status: Update agent status
  * - bus_agents: List active agents
+ * - bus_info: Get resolved bus configuration
  * - bus_claim: Claim a file for editing
  * - bus_release: Release a file claim
  * - bus_listen: Poll for new messages
+ * - bus_history: Paginated history from SQLite
+ * - bus_search: Full-text search across history
  */
 
 // Tool implementations

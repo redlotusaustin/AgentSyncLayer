@@ -71,7 +71,7 @@ export async function busHistoryExecute(
     const offset = (page - 1) * perPage;
 
     // Get SQLite client
-    const sqlite = getSqliteClient(resolveDbDir(context.directory), projectHash);
+    const sqlite = getSqliteClient(resolveDbDir(context.directory));
     if (!sqlite) {
       return {
         ok: false,

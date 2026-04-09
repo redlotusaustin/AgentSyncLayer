@@ -17,7 +17,7 @@ import { Database } from "bun:sqlite";
 import * as fs from "fs";
 import * as path from "path";
 import Redis from "ioredis";
-import { createHash } from "crypto";
+import { hashProjectPath } from "./src/namespace";
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -142,7 +142,7 @@ function resolvePaths(args: CliArgs): ResolvedPaths {
     dbPath = path.join(projectDir, ".agentbus", "history.db");
   }
 
-  // Resolve symlinks for hash (same logic as namespace.ts)
+  // Resolve to canonical path
   let canonical: string;
   try {
     canonical = fs.realpathSync(projectDir);
@@ -150,7 +150,7 @@ function resolvePaths(args: CliArgs): ResolvedPaths {
     canonical = path.resolve(projectDir);
   }
 
-  const projectHash = createHash("sha256").update(canonical).digest("hex").slice(0, 12);
+  const projectHash = hashProjectPath(canonical);
   return { projectDir: canonical, dbPath, projectHash };
 }
 
@@ -305,15 +305,15 @@ async function collectSnapshot(
         } catch { /* skip malformed */ }
       }
 
-      const lsKeys = await redis.keys(`${prefix}lastseen:*`);
-      for (const key of lsKeys) {
-        const [tsStr, ttl] = await Promise.all([redis.get(key), redis.ttl(key)]);
-        data.redis.lastSeens.push({
-          agentId: key.split(":").pop()!,
-          timestamp: tsStr ? parseInt(tsStr) : 0,
-          ttl,
-        });
-      }
+        const lsKeys = await redis.keys(`${prefix}lastseen:*`);
+        for (const key of lsKeys) {
+          const [tsStr, ttl] = await Promise.all([redis.get(key), redis.ttl(key)]);
+          data.redis.lastSeens.push({
+            agentId: key.split(":").pop()!,
+            timestamp: tsStr ? parseInt(tsStr, 10) : 0,
+            ttl,
+          });
+        }
     } catch (err) {
       console.error(`Redis query error: ${err instanceof Error ? err.message : err}`);
     }

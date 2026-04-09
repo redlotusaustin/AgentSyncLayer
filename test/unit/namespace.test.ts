@@ -4,10 +4,6 @@ import {
   buildKey,
   KeyBuilder,
   createKeyBuilder,
-  extractKeyType,
-  extractKeyIdentifier,
-  isProjectKey,
-  extractProjectHash,
 } from '../../src/namespace';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -112,61 +108,3 @@ describe('KeyBuilder', () => {
   });
 });
 
-describe('extractKeyType', () => {
-  const projectHash = 'a1b2c3d4e5f6';
-
-  test('extracts key types', () => {
-    expect(extractKeyType('opencode:a1b2c3d4e5f6:ch:general', projectHash)).toBe('ch');
-    expect(extractKeyType('opencode:a1b2c3d4e5f6:history:general', projectHash)).toBe('history');
-    expect(extractKeyType('opencode:a1b2c3d4e5f6:agent:devbox-1234', projectHash)).toBe('agent');
-    expect(extractKeyType('opencode:a1b2c3d4e5f6:claim:src/file.ts', projectHash)).toBe('claim');
-    expect(extractKeyType('opencode:a1b2c3d4e5f6:channels', projectHash)).toBe('channels');
-  });
-
-  test('returns null for invalid keys', () => {
-    expect(extractKeyType('opencode:other:ch:general', projectHash)).toBe(null);
-    expect(extractKeyType('other:a1b2c3d4e5f6:ch:general', projectHash)).toBe(null);
-    expect(extractKeyType('not-a-valid-key', projectHash)).toBe(null);
-  });
-});
-
-describe('extractKeyIdentifier', () => {
-  const projectHash = 'a1b2c3d4e5f6';
-
-  test('extracts identifiers', () => {
-    expect(extractKeyIdentifier('opencode:a1b2c3d4e5f6:ch:general', projectHash, 'ch')).toBe('general');
-    expect(extractKeyIdentifier('opencode:a1b2c3d4e5f6:agent:devbox-1234', projectHash, 'agent')).toBe('devbox-1234');
-    expect(extractKeyIdentifier('opencode:a1b2c3d4e5f6:claim:src/file.ts', projectHash, 'claim')).toBe('src/file.ts');
-  });
-
-  test('returns null for wrong type', () => {
-    expect(extractKeyIdentifier('opencode:a1b2c3d4e5f6:ch:general', projectHash, 'agent')).toBe(null);
-  });
-});
-
-describe('isProjectKey', () => {
-  const projectHash = 'a1b2c3d4e5f6';
-
-  test('identifies project keys', () => {
-    expect(isProjectKey('opencode:a1b2c3d4e5f6:ch:general', projectHash)).toBe(true);
-    expect(isProjectKey('opencode:a1b2c3d4e5f6:channels', projectHash)).toBe(true);
-  });
-
-  test('rejects keys from other projects', () => {
-    expect(isProjectKey('opencode:otherhash123:ch:general', projectHash)).toBe(false);
-    expect(isProjectKey('other:opencode:a1b2c3d4e5f6:ch:general', projectHash)).toBe(false);
-  });
-});
-
-describe('extractProjectHash', () => {
-  test('extracts project hash from keys', () => {
-    expect(extractProjectHash('opencode:a1b2c3d4e5f6:ch:general')).toBe('a1b2c3d4e5f6');
-    expect(extractProjectHash('opencode:000000000000:channels')).toBe('000000000000');
-  });
-
-  test('returns null for invalid keys', () => {
-    expect(extractProjectHash('invalid')).toBe(null);
-    expect(extractProjectHash('opencode:short:ch:general')).toBe(null);
-    expect(extractProjectHash('opencode:TOOLONGHASH123:ch:general')).toBe(null);
-  });
-});

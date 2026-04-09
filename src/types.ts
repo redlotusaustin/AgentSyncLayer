@@ -83,11 +83,19 @@ export type ErrorCode =
   | 'CHANNEL_INVALID'
   | 'CLAIM_CONFLICT'
   | 'CLAIM_NOT_FOUND'
+  | 'CLAIM_NOT_OWNER'
   | 'PATH_INVALID'
   | 'QUERY_INVALID'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
-  | 'SQLITE_UNAVAILABLE';
+  | 'SQLITE_UNAVAILABLE'
+  | 'MESSAGE_EMPTY'
+  | 'MESSAGE_TOO_LONG'
+  | 'TYPE_INVALID'
+  | 'TIMEOUT_INVALID'
+  | 'LIMIT_INVALID'
+  | 'TASK_EMPTY'
+  | 'TASK_TOO_LONG';
 
 /**
  * Common error response format

@@ -58,14 +58,14 @@ export async function busStatusExecute(
       return {
         ok: false,
         error: 'Task description cannot be empty',
-        code: 'CHANNEL_INVALID',
+        code: 'TASK_EMPTY',
       };
     }
     if (task.length > 256) {
       return {
         ok: false,
         error: 'Task description too long: max 256 characters',
-        code: 'CHANNEL_INVALID',
+        code: 'TASK_TOO_LONG',
       };
     }
 

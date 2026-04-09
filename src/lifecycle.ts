@@ -6,6 +6,7 @@
  * rather than reading from global state, making them reusable and testable.
  */
 
+import * as crypto from 'crypto';
 import { getRedisClient } from './redis';
 import type { AgentStatus, Claim, Message } from './types';
 
@@ -14,6 +15,53 @@ const SCAN_BATCH_SIZE = 100;
 
 /** Maximum total keys to scan (safety limit to prevent runaway scans) */
 const SCAN_MAX_KEYS = 10000;
+
+/** Maximum number of messages to keep in channel history */
+export const HISTORY_CAP = 100;
+
+/** Claim event channel name for coordination events */
+const CLAIMS_CHANNEL = 'claims';
+
+/**
+ * Publish a claim/release event message to the claims channel.
+ *
+ * Used by bus_claim and bus_release to notify other agents about claim changes.
+ *
+ * @param client - The raw ioredis client
+ * @param projectHash - The 12-character project hash
+ * @param agentId - The agent ID performing the action
+ * @param filePath - The file path being claimed/released
+ * @param eventType - Either 'claim' or 'release'
+ */
+export async function publishClaimEvent(
+  client: import('ioredis').Redis,
+  projectHash: string,
+  agentId: string,
+  filePath: string,
+  eventType: 'claim' | 'release'
+): Promise<void> {
+  const messageObj = {
+    id: `evt-${crypto.randomUUID()}`,
+    from: agentId,
+    channel: CLAIMS_CHANNEL,
+    type: eventType,
+    payload: {
+      text: `${eventType === 'claim' ? 'Claimed' : 'Released'}: ${filePath}`,
+      path: filePath,
+      agentId,
+    },
+    timestamp: new Date().toISOString(),
+    project: projectHash,
+  };
+
+  const messageJson = JSON.stringify(messageObj);
+  const pipeline = client.pipeline();
+  pipeline.publish(`opencode:${projectHash}:ch:${CLAIMS_CHANNEL}`, messageJson);
+  pipeline.zadd(`opencode:${projectHash}:history:${CLAIMS_CHANNEL}`, Date.now(), messageJson);
+  pipeline.zremrangebyrank(`opencode:${projectHash}:history:${CLAIMS_CHANNEL}`, 0, -(HISTORY_CAP + 1));
+  pipeline.sadd(`opencode:${projectHash}:channels`, CLAIMS_CHANNEL);
+  await pipeline.exec();
+}
 
 /**
  * Get all active agents from Redis for a project
@@ -37,17 +85,17 @@ export async function getActiveAgents(projectHash: string): Promise<AgentStatus[
     agentKeys.push(...keys);
   } while (cursor !== '0' && agentKeys.length < SCAN_MAX_KEYS);
 
-  const statuses = await Promise.all(
-    agentKeys.map(async (key) => {
-      const data = await client.get(key);
-      if (!data) return null;
-      try {
-        return JSON.parse(data) as AgentStatus;
-      } catch {
-        return null;
-      }
-    })
-  );
+  // Batch fetch all agent data in single round-trip
+  const agentDataList = await client.mget(agentKeys);
+
+  const statuses = agentDataList.map((data) => {
+    if (!data) return null;
+    try {
+      return JSON.parse(data) as AgentStatus;
+    } catch {
+      return null;
+    }
+  });
 
   return statuses
     .filter((status): status is AgentStatus => {
@@ -82,8 +130,12 @@ export async function getMyClaims(projectHash: string, agentId: string): Promise
   const claims: Claim[] = [];
   const prefix = `opencode:${projectHash}:claim:`;
 
-  for (const key of claimKeys) {
-    const data = await client.get(key);
+  // Batch fetch all claim data in single round-trip
+  const claimDataList = await client.mget(claimKeys);
+
+  for (let i = 0; i < claimKeys.length; i++) {
+    const key = claimKeys[i];
+    const data = claimDataList[i];
     if (!data) continue;
     try {
       const claim = JSON.parse(data) as Claim;
@@ -216,10 +268,12 @@ export async function cleanupAgent(projectHash: string, agentId: string): Promis
     // Release all claims held by this agent
     const claimPattern = `opencode:${projectHash}:claim:*`;
     let cursor = '0';
+    let keysScanned = 0;
 
     do {
       const [nextCursor, keys] = await client.scan(cursor, 'MATCH', claimPattern, 'COUNT', SCAN_BATCH_SIZE);
       cursor = nextCursor;
+      keysScanned += keys.length;
 
       for (const key of keys) {
         const data = await client.get(key);
@@ -235,7 +289,7 @@ export async function cleanupAgent(projectHash: string, agentId: string): Promis
           }
         }
       }
-    } while (cursor !== '0');
+    } while (cursor !== '0' && keysScanned < SCAN_MAX_KEYS);
   } catch (error) {
     console.warn('[AgentBus] Cleanup error:', error);
   }

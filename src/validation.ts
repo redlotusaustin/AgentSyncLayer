@@ -75,13 +75,13 @@ export function validateMessage(text: string): string {
   const trimmed = text.trim();
 
   if (trimmed.length === 0) {
-    throw new ValidationException('Message cannot be empty', 'CHANNEL_INVALID');
+    throw new ValidationException('Message cannot be empty', 'MESSAGE_EMPTY');
   }
 
   if (trimmed.length > MAX_MESSAGE_LENGTH) {
     throw new ValidationException(
       `Message too long: max ${MAX_MESSAGE_LENGTH} characters`,
-      'CHANNEL_INVALID'
+      'MESSAGE_TOO_LONG'
     );
   }
 
@@ -144,7 +144,7 @@ export function validateMessageType(type: string): string {
   if (!validTypes.includes(type)) {
     throw new ValidationException(
       `Invalid message type: must be one of ${validTypes.join(', ')}`,
-      'CHANNEL_INVALID'
+      'TYPE_INVALID'
     );
   }
 
@@ -210,7 +210,7 @@ export function validateTimeout(timeout: number): number {
   if (!Number.isInteger(timeout) || timeout < 1 || timeout > 30) {
     throw new ValidationException(
       'Invalid timeout: must be an integer between 1 and 30 seconds',
-      'CHANNEL_INVALID'
+      'TIMEOUT_INVALID'
     );
   }
   return timeout;
@@ -227,7 +227,7 @@ export function validateLimit(limit: number): number {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new ValidationException(
       'Invalid limit: must be an integer between 1 and 100',
-      'CHANNEL_INVALID'
+      'LIMIT_INVALID'
     );
   }
   return limit;

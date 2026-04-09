@@ -2,65 +2,20 @@
  * bus_release tool - Release a file claim
  *
  * Operations:
- * 1. GET claim to verify ownership
- * 2. Lua script for atomic check + delete
- * 3. Auto-publish release event to "claims" channel
+ * 1. Lua script for atomic check + delete
+ * 2. Auto-publish release event to "claims" channel
  */
 
-import * as crypto from 'crypto';
 import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
 import { validateFilePath, ValidationException } from '../validation';
 import { getSessionAgentId } from '../session';
+import { publishClaimEvent } from '../lifecycle';
 import type {
-  Claim,
   ToolContext,
   ToolResponse,
   ReleaseResponseData,
 } from '../types';
-
-/**
- * Claim event channel name for coordination events
- */
-const CLAIMS_CHANNEL = 'claims';
-
-/**
- * Publish a release event message to the claims channel
- */
-async function publishReleaseEvent(
-  client: import('ioredis').Redis,
-  projectHash: string,
-  agentId: string,
-  filePath: string
-): Promise<void> {
-  const now = new Date().toISOString();
-  const messageObj = {
-    id: `evt-${crypto.randomUUID()}`,
-    from: agentId,
-    channel: CLAIMS_CHANNEL,
-    type: 'release',
-    payload: {
-      text: `Released: ${filePath}`,
-      path: filePath,
-      agentId,
-    },
-    timestamp: now,
-    project: projectHash,
-  };
-
-  const messageJson = JSON.stringify(messageObj);
-  const pubSubChannel = `opencode:${projectHash}:ch:${CLAIMS_CHANNEL}`;
-  const historyKey = `opencode:${projectHash}:history:${CLAIMS_CHANNEL}`;
-  const channelsKey = `opencode:${projectHash}:channels`;
-  const timestampMs = Date.now();
-
-  const pipeline = client.pipeline();
-  pipeline.publish(pubSubChannel, messageJson);
-  pipeline.zadd(historyKey, timestampMs, messageJson);
-  pipeline.zremrangebyrank(historyKey, 0, -501);
-  pipeline.sadd(channelsKey, CLAIMS_CHANNEL);
-  await pipeline.exec();
-}
 
 /**
  * Tool arguments for bus_release
@@ -70,26 +25,20 @@ export interface BusReleaseArgs {
 }
 
 /**
- * Lua script for atomic claim release with ownership verification
+ * Lua script for atomic claim release with ownership verification.
  *
  * KEYS[1] = claim key
  * ARGV[1] = agent ID claiming ownership
  *
  * Returns:
  *   1 = released successfully
- *   0 = not claimed
- *  -1 = claimed by another agent
- *  -2 = key doesn't exist
+ *   2 = malformed claim data (deleted safely)
+ *  -1 = claimed by another agent (not owner)
+ *  -2 = key doesn't exist (not claimed)
  */
 const RELEASE_CLAIM_SCRIPT = `
 local key = KEYS[1]
 local agentId = ARGV[1]
-
--- Check if key exists
-local exists = redis.call('EXISTS', key)
-if exists == 0 then
-  return -2
-end
 
 -- Get current claim
 local claimData = redis.call('GET', key)
@@ -97,8 +46,13 @@ if not claimData then
   return -2
 end
 
--- Parse claim
-local claim = cjson.decode(claimData)
+-- Try to parse claim
+local ok, claim = pcall(cjson.decode, claimData)
+if not ok then
+  -- Malformed claim - delete and return success
+  redis.call('DEL', key)
+  return 2
+end
 
 -- Check ownership
 if claim.agentId ~= agentId then
@@ -144,41 +98,7 @@ export async function busReleaseExecute(
     const claimKey = `opencode:${projectHash}:claim:${filePath}`;
     const client = redis.getClient();
 
-    // First, check if claim exists at all
-    const claimData = await client.get(claimKey);
-
-    if (!claimData) {
-      return {
-        ok: false,
-        error: `File '${filePath}' is not claimed`,
-        code: 'CLAIM_NOT_FOUND',
-      };
-    }
-
-    // Parse claim to check ownership
-    try {
-      const claim = JSON.parse(claimData) as Claim;
-
-      if (claim.agentId !== agentId) {
-        return {
-          ok: false,
-          error: `File '${filePath}' is not claimed by this agent`,
-          code: 'CLAIM_NOT_FOUND',
-        };
-      }
-    } catch {
-      // Malformed claim data - delete it anyway
-      await client.del(claimKey);
-      return {
-        ok: true,
-        data: {
-          path: filePath,
-          released: true,
-        },
-      };
-    }
-
-    // Use Lua script for atomic check + delete
+    // Use Lua script for atomic check + delete (handles all cases: not found, not owner, malformed, success)
     const result = await client.eval(
       RELEASE_CLAIM_SCRIPT,
       1,
@@ -188,39 +108,22 @@ export async function busReleaseExecute(
 
     switch (result) {
       case 1:
-        // Publish release event to claims channel for coordination
-        await publishReleaseEvent(client, projectHash, agentId, filePath);
+        // Released successfully - publish event
+        await publishClaimEvent(client, projectHash, agentId, filePath, 'release');
+        return { ok: true, data: { path: filePath, released: true } };
 
-        return {
-          ok: true,
-          data: {
-            path: filePath,
-            released: true,
-          },
-        };
+      case 2:
+        // Malformed claim deleted safely
+        return { ok: true, data: { path: filePath, released: true } };
 
       case -2:
-        // Key was deleted between our check and script execution
-        return {
-          ok: false,
-          error: `File '${filePath}' is not claimed`,
-          code: 'CLAIM_NOT_FOUND',
-        };
+        return { ok: false, error: `File '${filePath}' is not claimed`, code: 'CLAIM_NOT_FOUND' };
 
       case -1:
-        // Ownership check failed
-        return {
-          ok: false,
-          error: `File '${filePath}' is not claimed by this agent`,
-          code: 'CLAIM_NOT_FOUND',
-        };
+        return { ok: false, error: `File '${filePath}' is not claimed by this agent`, code: 'CLAIM_NOT_OWNER' };
 
       default:
-        return {
-          ok: false,
-          error: `Internal error: unexpected release result ${result}`,
-          code: 'INTERNAL_ERROR',
-        };
+        return { ok: false, error: `Internal error: unexpected release result ${result}`, code: 'INTERNAL_ERROR' };
     }
   } catch (error) {
     if (error instanceof ValidationException) {

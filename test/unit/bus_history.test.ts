@@ -403,7 +403,7 @@ describe('bus_history unit tests', () => {
       );
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('CHANNEL_INVALID');
+      expect(result.code).toBe('LIMIT_INVALID');
     });
 
     test('per_page=101 returns error (out of range)', async () => {
@@ -413,7 +413,7 @@ describe('bus_history unit tests', () => {
       );
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('CHANNEL_INVALID');
+      expect(result.code).toBe('LIMIT_INVALID');
     });
 
     test('per_page=100 is valid', async () => {

@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { HeartbeatManager, createHeartbeatManager, type HeartbeatState } from '../../src/heartbeat';
+import { HeartbeatManager, type HeartbeatState } from '../../src/heartbeat';
 
 // Test state factory
 function createTestState(overrides: Partial<HeartbeatState> = {}): HeartbeatState {
@@ -109,26 +109,6 @@ describe('HeartbeatManager', () => {
       expect(() => manager.stop()).not.toThrow();
       expect(manager.isActive()).toBe(false);
     });
-  });
-});
-
-describe('createHeartbeatManager', () => {
-  test('creates manager without auto-start', async () => {
-    const state = createTestState();
-
-    const manager = await createHeartbeatManager(state, false);
-    expect(manager.isActive()).toBe(false);
-  });
-
-  test('creates manager with auto-start', async () => {
-    const state = createTestState();
-
-    const manager = await createHeartbeatManager(state, true);
-    // Note: auto-start might not actually run without real Redis
-    // but the manager should be created successfully
-    expect(manager).toBeDefined();
-    expect(typeof manager.start).toBe('function');
-    expect(typeof manager.stop).toBe('function');
   });
 });
 

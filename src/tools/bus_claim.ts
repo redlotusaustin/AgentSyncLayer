@@ -7,11 +7,11 @@
  * 3. Return conflict info if already claimed
  */
 
-import * as crypto from 'crypto';
 import { getRedisClient } from '../redis';
 import { resolveProjectHash } from '../config';
 import { validateFilePath, ValidationException } from '../validation';
 import { getSessionAgentId } from '../session';
+import { publishClaimEvent } from '../lifecycle';
 import type {
   Claim,
   ToolContext,
@@ -20,21 +20,60 @@ import type {
 } from '../types';
 
 /**
- * Tool arguments for bus_claim
- */
-export interface BusClaimArgs {
-  path: string;
-}
-
-/**
  * Default TTL for file claims (300 seconds / 5 minutes as per contract)
  */
 const CLAIM_TTL_SECONDS = 300;
 
 /**
- * Claim event channel name for coordination events
+ * Build a success response for claim acquisition.
  */
-const CLAIMS_CHANNEL = 'claims';
+function buildClaimSuccessResponse(
+  filePath: string,
+  agentId: string,
+  claimedAt: string,
+  expiresAt: string
+): { ok: true; data: ClaimResponseData } {
+  return {
+    ok: true,
+    data: {
+      path: filePath,
+      agentId,
+      claimedAt,
+      expiresAt,
+    },
+  };
+}
+
+/**
+ * Build a conflict response for failed claim acquisition.
+ */
+function buildClaimConflictResponse(
+  filePath: string,
+  conflictClaim: Claim | null,
+  isRetry: boolean
+): { ok: false; error: string; code: 'CLAIM_CONFLICT'; data: ClaimConflictData } {
+  if (conflictClaim) {
+    const extra = isRetry ? '' : ` (claimed at ${conflictClaim.claimedAt}, expires at ${conflictClaim.expiresAt})`;
+    return {
+      ok: false,
+      error: `File '${filePath}' is already claimed by agent ${conflictClaim.agentId}${extra}`,
+      code: 'CLAIM_CONFLICT',
+      data: {
+        path: filePath,
+        heldBy: conflictClaim.agentId,
+        claimedAt: conflictClaim.claimedAt,
+        expiresAt: conflictClaim.expiresAt,
+      },
+    };
+  }
+
+  return {
+    ok: false,
+    error: `Failed to claim file '${filePath}': concurrent access detected`,
+    code: 'CLAIM_CONFLICT',
+    data: { path: filePath, heldBy: 'unknown', claimedAt: 'unknown', expiresAt: 'unknown' },
+  };
+}
 
 /**
  * Lua script for atomic claim acquisition with conflict detection.
@@ -85,42 +124,10 @@ return {0, existing}
 `;
 
 /**
- * Publish a claim event message to the claims channel
+ * Arguments for bus_claim tool
  */
-async function publishClaimEvent(
-  client: import('ioredis').Redis,
-  projectHash: string,
-  agentId: string,
-  filePath: string,
-  eventType: 'claim' | 'release'
-): Promise<void> {
-  const now = new Date().toISOString();
-  const messageObj = {
-    id: `evt-${crypto.randomUUID()}`,
-    from: agentId,
-    channel: CLAIMS_CHANNEL,
-    type: eventType,
-    payload: {
-      text: `${eventType === 'claim' ? 'Claimed' : 'Released'}: ${filePath}`,
-      path: filePath,
-      agentId,
-    },
-    timestamp: now,
-    project: projectHash,
-  };
-
-  const messageJson = JSON.stringify(messageObj);
-  const pubSubChannel = `opencode:${projectHash}:ch:${CLAIMS_CHANNEL}`;
-  const historyKey = `opencode:${projectHash}:history:${CLAIMS_CHANNEL}`;
-  const channelsKey = `opencode:${projectHash}:channels`;
-  const timestampMs = Date.now();
-
-  const pipeline = client.pipeline();
-  pipeline.publish(pubSubChannel, messageJson);
-  pipeline.zadd(historyKey, timestampMs, messageJson);
-  pipeline.zremrangebyrank(historyKey, 0, -501);
-  pipeline.sadd(channelsKey, CLAIMS_CHANNEL);
-  await pipeline.exec();
+export interface BusClaimArgs {
+  path: string;
 }
 
 /**
@@ -189,32 +196,12 @@ export async function busClaimExecute(
       // Publish claim event to claims channel for coordination
       await publishClaimEvent(client, projectHash, agentId, filePath, 'claim');
 
-      return {
-        ok: true,
-        data: {
-          path: filePath,
-          agentId,
-          claimedAt: claim.claimedAt,
-          expiresAt: claim.expiresAt,
-        },
-      };
+      return buildClaimSuccessResponse(filePath, agentId, claim.claimedAt, claim.expiresAt);
     }
 
     // Conflict - another agent holds the claim
     if (conflictClaim) {
-      const conflictData: ClaimConflictData = {
-        path: filePath,
-        heldBy: conflictClaim.agentId,
-        claimedAt: conflictClaim.claimedAt,
-        expiresAt: conflictClaim.expiresAt,
-      };
-
-      return {
-        ok: false,
-        error: `File '${filePath}' is already claimed by agent ${conflictData.heldBy} (claimed at ${conflictData.claimedAt}, expires at ${conflictData.expiresAt})`,
-        code: 'CLAIM_CONFLICT',
-        data: conflictData,
-      };
+      return buildClaimConflictResponse(filePath, conflictClaim, false);
     }
 
     // Race condition during script execution - retry once
@@ -231,38 +218,11 @@ export async function busClaimExecute(
 
     if (retryOk === 1) {
       await publishClaimEvent(client, projectHash, agentId, filePath, 'claim');
-      return {
-        ok: true,
-        data: {
-          path: filePath,
-          agentId,
-          claimedAt: claim.claimedAt,
-          expiresAt: claim.expiresAt,
-        },
-      };
+      return buildClaimSuccessResponse(filePath, agentId, claim.claimedAt, claim.expiresAt);
     }
 
-    // Give up after retry
-    return {
-      ok: false,
-      error: retryConflict
-        ? `File '${filePath}' is already claimed by agent ${retryConflict.agentId}`
-        : `Failed to claim file '${filePath}': concurrent access detected`,
-      code: 'CLAIM_CONFLICT',
-      data: retryConflict
-        ? {
-            path: filePath,
-            heldBy: retryConflict.agentId,
-            claimedAt: retryConflict.claimedAt,
-            expiresAt: retryConflict.expiresAt,
-          }
-        : {
-            path: filePath,
-            heldBy: 'unknown',
-            claimedAt: 'unknown',
-            expiresAt: 'unknown',
-          },
-    };
+    // Give up after retry - use helper to build conflict response
+    return buildClaimConflictResponse(filePath, retryConflict, true);
   } catch (error) {
     if (error instanceof ValidationException) {
       const code = error.code;
