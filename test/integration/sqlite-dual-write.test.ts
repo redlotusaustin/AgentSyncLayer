@@ -8,27 +8,22 @@
  * Tests will skip gracefully if Redis is not running.
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
+import { busHistoryExecute } from '../../src/tools/bus_history';
+import { busReadExecute } from '../../src/tools/bus_read';
+import { busSearchExecute } from '../../src/tools/bus_search';
+import { busSendExecute } from '../../src/tools/bus_send';
 import {
   createTestContext,
-  getTestProjectHash,
   generateTestAgentId,
+  getTestProjectHash,
   isRedisAvailable,
 } from '../helpers';
-import {
-  createTestMessage,
-  createSearchableMessage,
-} from '../fixtures';
-import { getSqliteClient, closeSqliteClient } from '../../src/sqlite';
-import { busSendExecute } from '../../src/tools/bus_send';
-import { busReadExecute } from '../../src/tools/bus_read';
-import { busHistoryExecute } from '../../src/tools/bus_history';
-import { busSearchExecute } from '../../src/tools/bus_search';
-import { setSessionAgentId, resetSessionAgentId } from '../../src/session';
-import type { Message } from '../../src/types';
 
 describe('T8: Dual-Write Consistency', () => {
   const ctx = createTestContext();
@@ -84,7 +79,7 @@ describe('T8: Dual-Write Consistency', () => {
       // Send a message
       const sendResult = await busSendExecute(
         { channel, message: 'Hello from test' },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(sendResult.ok).toBe(true);
@@ -92,10 +87,7 @@ describe('T8: Dual-Write Consistency', () => {
       const messageId = sendResult.data!.id;
 
       // Read it back via bus_read (Redis first)
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
 
       expect(readResult.ok).toBe(true);
       expect(readResult.data).toBeDefined();
@@ -115,7 +107,7 @@ describe('T8: Dual-Write Consistency', () => {
       // Send a message
       const sendResult = await busSendExecute(
         { channel, message: 'Persistent message' },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(sendResult.ok).toBe(true);
@@ -124,7 +116,7 @@ describe('T8: Dual-Write Consistency', () => {
       // Read via bus_history (SQLite)
       const historyResult = await busHistoryExecute(
         { channel, page: 1, per_page: 50 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(historyResult.ok).toBe(true);
@@ -142,15 +134,12 @@ describe('T8: Dual-Write Consistency', () => {
 
       // Send multiple messages
       for (let i = 0; i < 5; i++) {
-        await busSendExecute(
-          { channel, message: `Message ${i}` },
-          { directory: testDir }
-        );
+        await busSendExecute({ channel, message: `Message ${i}` }, { directory: testDir });
       }
 
       const historyResult = await busHistoryExecute(
         { channel, page: 1, per_page: 10 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(historyResult.ok).toBe(true);
@@ -173,7 +162,7 @@ describe('T8: Dual-Write Consistency', () => {
       // Send a message with unique searchable content
       const sendResult = await busSendExecute(
         { channel, message: `This contains ${uniqueSearchTerm} for searching` },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(sendResult.ok).toBe(true);
@@ -181,7 +170,7 @@ describe('T8: Dual-Write Consistency', () => {
       // Search for it
       const searchResult = await busSearchExecute(
         { query: uniqueSearchTerm, limit: 20 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(searchResult.ok).toBe(true);
@@ -189,8 +178,8 @@ describe('T8: Dual-Write Consistency', () => {
       expect(searchResult.data!.count).toBeGreaterThan(0);
 
       // Verify the search found our message
-      const found = searchResult.data!.results.some(
-        (r) => r.message.payload.text.includes(uniqueSearchTerm)
+      const found = searchResult.data!.results.some((r) =>
+        r.message.payload.text.includes(uniqueSearchTerm),
       );
       expect(found).toBe(true);
     });
@@ -201,12 +190,12 @@ describe('T8: Dual-Write Consistency', () => {
 
       await busSendExecute(
         { channel, message: `Here is the ${term} to find in the text` },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       const searchResult = await busSearchExecute(
         { query: term, limit: 10 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(searchResult.ok).toBe(true);
@@ -225,7 +214,7 @@ describe('T8: Dual-Write Consistency', () => {
       // Send a message
       const sendResult = await busSendExecute(
         { channel, message: 'Should persist in SQLite' },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(sendResult.ok).toBe(true);
@@ -241,7 +230,7 @@ describe('T8: Dual-Write Consistency', () => {
       // But bus_history should still return the message from SQLite
       const historyResult = await busHistoryExecute(
         { channel, page: 1, per_page: 50 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(historyResult.ok).toBe(true);
@@ -260,7 +249,7 @@ describe('T8: Dual-Write Consistency', () => {
       setSessionAgentId(agentA);
       const sendResult = await busSendExecute(
         { channel, message: 'Shared message from Agent A' },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(sendResult.ok).toBe(true);
@@ -270,7 +259,7 @@ describe('T8: Dual-Write Consistency', () => {
       setSessionAgentId(agentB);
       const historyResult = await busHistoryExecute(
         { channel, page: 1, per_page: 50 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(historyResult.ok).toBe(true);
@@ -290,17 +279,14 @@ describe('T8: Dual-Write Consistency', () => {
       setSessionAgentId(agentA);
       const sendResult = await busSendExecute(
         { channel, message: 'Shared via bus_read' },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(sendResult.ok).toBe(true);
 
       // Agent B reads (uses Redis cache first, should find it)
       setSessionAgentId(agentB);
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
 
       expect(readResult.ok).toBe(true);
       expect(readResult.data!.messages.length).toBeGreaterThan(0);

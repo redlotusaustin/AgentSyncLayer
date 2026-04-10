@@ -1,7 +1,12 @@
-import { describe, test, expect, afterEach } from 'bun:test';
-import { resolveBusConfig, resolveProjectHash, resolveDbDir, resetBusConfig } from '../../src/config';
-import { createTestBusEnv } from '../helpers';
+import { afterEach, describe, expect, test } from 'bun:test';
+import {
+  resetBusConfig,
+  resolveBusConfig,
+  resolveDbDir,
+  resolveProjectHash,
+} from '../../src/config';
 import { hashProjectPath } from '../../src/namespace';
+import { createTestBusEnv } from '../helpers';
 
 describe('config-default (T1)', () => {
   afterEach(() => {

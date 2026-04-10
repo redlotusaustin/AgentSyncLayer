@@ -7,25 +7,21 @@
  * Tests: I2.1-I2.2
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { resetBusConfig, resolveBusConfig } from '../../src/config';
+import { hashProjectPath } from '../../src/namespace';
+import { setSessionAgentId } from '../../src/session';
 import {
-  createTestContext,
-  isRedisAvailable,
-  generateTestAgentId,
-} from '../helpers';
-import {
-  busSendExecute,
-  busReadExecute,
-  busStatusExecute,
   busAgentsExecute,
+  busReadExecute,
+  busSendExecute,
+  busStatusExecute,
   cleanupRateLimiter,
 } from '../../src/tools';
-import { resetBusConfig, resolveBusConfig, BusConfig } from '../../src/config';
-import { hashProjectPath } from '../../src/namespace';
-import { getSessionAgentId, setSessionAgentId } from '../../src/session';
+import { createTestContext, generateTestAgentId, isRedisAvailable } from '../helpers';
 
 /**
  * Create a temp directory with optional .agentsynclayer.json config
@@ -40,18 +36,23 @@ function createTestDir(withConfig = false): {
 
   if (withConfig) {
     // Create .agentsynclayer.json pointing to the dir itself (would be overridden by env)
-    fs.writeFileSync(
-      path.join(dir, '.agentsynclayer.json'),
-      JSON.stringify({ bus: '.' })
-    );
+    fs.writeFileSync(path.join(dir, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
   }
 
   return {
     dir,
     sharedDir,
     cleanup: () => {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
-      try { fs.rmSync(sharedDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+      try {
+        fs.rmSync(sharedDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
     },
   };
 }
@@ -109,7 +110,7 @@ describe('I2: Env Var Override', () => {
         setSessionAgentId(agent1Id);
         const sendResult1 = await busSendExecute(
           { channel: 'general', message: 'Message from agent 1' },
-          { directory: dir1 }
+          { directory: dir1 },
         );
         expect(sendResult1.ok).toBe(true);
 
@@ -117,7 +118,7 @@ describe('I2: Env Var Override', () => {
         setSessionAgentId(agent2Id);
         const sendResult2 = await busSendExecute(
           { channel: 'general', message: 'Message from agent 2' },
-          { directory: dir2 }
+          { directory: dir2 },
         );
         expect(sendResult2.ok).toBe(true);
 
@@ -125,7 +126,7 @@ describe('I2: Env Var Override', () => {
         setSessionAgentId(agent1Id);
         const readResult1 = await busReadExecute(
           { channel: 'general', limit: 10 },
-          { directory: dir1 }
+          { directory: dir1 },
         );
         expect(readResult1.ok).toBe(true);
         expect(readResult1.data!.messages.length).toBeGreaterThanOrEqual(2);
@@ -133,22 +134,18 @@ describe('I2: Env Var Override', () => {
         setSessionAgentId(agent2Id);
         const readResult2 = await busReadExecute(
           { channel: 'general', limit: 10 },
-          { directory: dir2 }
+          { directory: dir2 },
         );
         expect(readResult2.ok).toBe(true);
         expect(readResult2.data!.messages.length).toBeGreaterThanOrEqual(2);
 
         // Verify agent 2 can see agent 1's message
-        const msgFromAgent1 = readResult2.data!.messages.find(
-          (m) => m.from === agent1Id
-        );
+        const msgFromAgent1 = readResult2.data!.messages.find((m) => m.from === agent1Id);
         expect(msgFromAgent1).toBeDefined();
         expect((msgFromAgent1!.payload as any).text).toBe('Message from agent 1');
 
         // Verify agent 1 can see agent 2's message
-        const msgFromAgent2 = readResult1.data!.messages.find(
-          (m) => m.from === agent2Id
-        );
+        const msgFromAgent2 = readResult1.data!.messages.find((m) => m.from === agent2Id);
         expect(msgFromAgent2).toBeDefined();
         expect((msgFromAgent2!.payload as any).text).toBe('Message from agent 2');
       } finally {
@@ -197,16 +194,10 @@ describe('I2: Env Var Override', () => {
 
         // Register both agents
         setSessionAgentId(agent1Id);
-        await busStatusExecute(
-          { task: 'Task 1', channels: ['general'] },
-          { directory: dir1 }
-        );
+        await busStatusExecute({ task: 'Task 1', channels: ['general'] }, { directory: dir1 });
 
         setSessionAgentId(agent2Id);
-        await busStatusExecute(
-          { task: 'Task 2', channels: ['general'] },
-          { directory: dir2 }
-        );
+        await busStatusExecute({ task: 'Task 2', channels: ['general'] }, { directory: dir2 });
 
         // Query from agent 1's context
         setSessionAgentId(agent1Id);
@@ -284,10 +275,7 @@ describe('I2: Env Var Override', () => {
 
       try {
         // Create config at root
-        fs.writeFileSync(
-          path.join(rootDir, '.agentsynclayer.json'),
-          JSON.stringify({ bus: '.' })
-        );
+        fs.writeFileSync(path.join(rootDir, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
         // Set env var to different directory
         process.env.AGENTSYNCLAYER_BUS_ID = envDir;
@@ -299,8 +287,16 @@ describe('I2: Env Var Override', () => {
         expect(config.bus_dir).toBe(envDir);
         expect(config.projectHash).toBe(hashProjectPath(envDir));
       } finally {
-        try { fs.rmSync(rootDir, { recursive: true, force: true }); } catch { /* ignore */ }
-        try { fs.rmSync(envDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        try {
+          fs.rmSync(rootDir, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
+        try {
+          fs.rmSync(envDir, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
       }
     });
   });

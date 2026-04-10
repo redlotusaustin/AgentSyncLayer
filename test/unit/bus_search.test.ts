@@ -14,21 +14,14 @@
  * - T6.10: returns SQLITE_UNAVAILABLE when SQLite down
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import {
-  getSqliteClient,
-  closeSqliteClient,
-} from '../../src/sqlite';
-import {
-  RedisClient,
-  setRedisClient,
-  resetRedisClient,
-} from '../../src/redis';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { hashProjectPath } from '../../src/namespace';
+import { RedisClient, resetRedisClient, setRedisClient } from '../../src/redis';
 import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
 import { busSearchExecute } from '../../src/tools/bus_search';
 import type { Message, ToolContext } from '../../src/types';
 
@@ -108,15 +101,14 @@ describe('bus_search unit tests', () => {
     test('finds message containing "authentication"', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Need to fix authentication bug in login flow' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'authentication' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Need to fix authentication bug in login flow' },
+        }),
       );
+
+      const result = await busSearchExecute({ query: 'authentication' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(1);
@@ -127,23 +119,26 @@ describe('bus_search unit tests', () => {
     test('finds multiple messages with same term', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Fix authentication' },
-      }));
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Add authentication tests' },
-      }));
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Unrelated message' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'authentication' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Fix authentication' },
+        }),
       );
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Add authentication tests' },
+        }),
+      );
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Unrelated message' },
+        }),
+      );
+
+      const result = await busSearchExecute({ query: 'authentication' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(2);
@@ -154,15 +149,14 @@ describe('bus_search unit tests', () => {
     test('finds "auth" and matches "authentication"', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Implementing authentication flow for users' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'auth' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Implementing authentication flow for users' },
+        }),
       );
+
+      const result = await busSearchExecute({ query: 'auth' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(1);
@@ -172,15 +166,14 @@ describe('bus_search unit tests', () => {
     test('finds prefix matches via wildcard', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Configuration management for services' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'config' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Configuration management for services' },
+        }),
       );
+
+      const result = await busSearchExecute({ query: 'config' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(1);
@@ -191,19 +184,20 @@ describe('bus_search unit tests', () => {
     test('returns only messages from specified channel', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Found bug in database query' },
-      }));
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'claims',
-        payload: { text: 'Found bug in file claims' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'bug', channel: 'general' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Found bug in database query' },
+        }),
       );
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'claims',
+          payload: { text: 'Found bug in file claims' },
+        }),
+      );
+
+      const result = await busSearchExecute({ query: 'bug', channel: 'general' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(1);
@@ -214,15 +208,14 @@ describe('bus_search unit tests', () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
       // Only in claims channel - should not be found with 'general' filter
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'claims',
-        payload: { text: 'Redis cache issue with claims' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'Redis', channel: 'general' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'claims',
+          payload: { text: 'Redis cache issue with claims' },
+        }),
       );
+
+      const result = await busSearchExecute({ query: 'Redis', channel: 'general' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(0);
@@ -235,16 +228,15 @@ describe('bus_search unit tests', () => {
 
       // Insert 50 matching messages
       for (let i = 0; i < 50; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          payload: { text: `Message with error keyword number ${i}` },
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            payload: { text: `Message with error keyword number ${i}` },
+          }),
+        );
       }
 
-      const result = await busSearchExecute(
-        { query: 'error', limit: 5 },
-        testContext
-      );
+      const result = await busSearchExecute({ query: 'error', limit: 5 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(5);
@@ -255,16 +247,15 @@ describe('bus_search unit tests', () => {
 
       // Insert 30 matching messages
       for (let i = 0; i < 30; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          payload: { text: `Testing search limit ${i}` },
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            payload: { text: `Testing search limit ${i}` },
+          }),
+        );
       }
 
-      const result = await busSearchExecute(
-        { query: 'Testing' },
-        testContext
-      );
+      const result = await busSearchExecute({ query: 'Testing' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(20); // Default limit
@@ -276,28 +267,29 @@ describe('bus_search unit tests', () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
       // Message with single occurrence
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        id: 'single-occurrence',
-        payload: { text: 'An error occurred' },
-      }));
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          id: 'single-occurrence',
+          payload: { text: 'An error occurred' },
+        }),
+      );
 
       // Message with multiple occurrences (should rank higher)
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        id: 'multiple-occurrence',
-        payload: { text: 'error handling error recovery error handling' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'error' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          id: 'multiple-occurrence',
+          payload: { text: 'error handling error recovery error handling' },
+        }),
       );
+
+      const result = await busSearchExecute({ query: 'error' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(2);
       // The message with more occurrences should rank higher (lower rank number)
-      const ranks = result.data!.results.map(r => r.rank);
+      const ranks = result.data!.results.map((r) => r.rank);
       expect(ranks[0]).toBeLessThanOrEqual(ranks[1]);
     });
   });
@@ -306,15 +298,14 @@ describe('bus_search unit tests', () => {
     test('snippet contains >> and << delimiters', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'The authentication module needs refactoring' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'authentication' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'The authentication module needs refactoring' },
+        }),
       );
+
+      const result = await busSearchExecute({ query: 'authentication' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.results[0].snippet).toBeDefined();
@@ -325,15 +316,14 @@ describe('bus_search unit tests', () => {
     test('snippet shows context around matched text', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'The authentication module needs refactoring for better security' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'authentication' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'The authentication module needs refactoring for better security' },
+        }),
       );
+
+      const result = await busSearchExecute({ query: 'authentication' }, testContext);
 
       expect(result.ok).toBe(true);
       const snippet = result.data!.results[0].snippet;
@@ -345,15 +335,14 @@ describe('bus_search unit tests', () => {
     test('searching for non-existent term returns empty results', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Regular message about the project' },
-      }));
-
-      const result = await busSearchExecute(
-        { query: 'xyznonexistent123' },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Regular message about the project' },
+        }),
       );
+
+      const result = await busSearchExecute({ query: 'xyznonexistent123' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.results).toEqual([]);
@@ -362,10 +351,7 @@ describe('bus_search unit tests', () => {
     });
 
     test('empty database returns empty results', async () => {
-      const result = await busSearchExecute(
-        { query: 'anything' },
-        testContext
-      );
+      const result = await busSearchExecute({ query: 'anything' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.results).toEqual([]);
@@ -375,10 +361,7 @@ describe('bus_search unit tests', () => {
 
   describe('T6.8: rejects empty query', () => {
     test('empty string returns error', async () => {
-      const result = await busSearchExecute(
-        { query: '' },
-        testContext
-      );
+      const result = await busSearchExecute({ query: '' }, testContext);
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('QUERY_INVALID');
@@ -386,20 +369,14 @@ describe('bus_search unit tests', () => {
     });
 
     test('whitespace-only string returns error', async () => {
-      const result = await busSearchExecute(
-        { query: '   ' },
-        testContext
-      );
+      const result = await busSearchExecute({ query: '   ' }, testContext);
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('QUERY_INVALID');
     });
 
     test('tab and newline only returns error', async () => {
-      const result = await busSearchExecute(
-        { query: '\t\n' },
-        testContext
-      );
+      const result = await busSearchExecute({ query: '\t\n' }, testContext);
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('QUERY_INVALID');
@@ -410,35 +387,28 @@ describe('bus_search unit tests', () => {
     test('searching for OR does not cause FTS5 syntax error', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'The OR operator in FTS5 works differently' },
-      }));
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'The OR operator in FTS5 works differently' },
+        }),
+      );
 
       // Should not throw - sanitizeFts5Query handles this
-      const result = await busSearchExecute(
-        { query: 'OR' },
-        testContext
-      );
+      const result = await busSearchExecute({ query: 'OR' }, testContext);
 
       expect(result.ok).toBe(true);
       // The query is sanitized, so it searches for literal "OR" text
     });
 
     test('searching for AND does not cause syntax error', async () => {
-      const result = await busSearchExecute(
-        { query: 'AND' },
-        testContext
-      );
+      const result = await busSearchExecute({ query: 'AND' }, testContext);
 
       expect(result.ok).toBe(true);
     });
 
     test('searching for NOT does not cause syntax error', async () => {
-      const result = await busSearchExecute(
-        { query: 'NOT' },
-        testContext
-      );
+      const result = await busSearchExecute({ query: 'NOT' }, testContext);
 
       expect(result.ok).toBe(true);
     });
@@ -446,23 +416,22 @@ describe('bus_search unit tests', () => {
     test('SQL injection attempt is handled safely', async () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-        payload: { text: 'Normal message' },
-      }));
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+          payload: { text: 'Normal message' },
+        }),
+      );
 
       // Attempt SQL injection via FTS5
       const result = await busSearchExecute(
         { query: '"test"; DROP TABLE messages--' },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
       // Should handle safely without crashing or deleting data
-      const verifyResult = await busSearchExecute(
-        { query: 'Normal' },
-        testContext
-      );
+      const verifyResult = await busSearchExecute({ query: 'Normal' }, testContext);
       expect(verifyResult.data!.count).toBe(1);
     });
   });
@@ -471,7 +440,7 @@ describe('bus_search unit tests', () => {
     test('returns SQLITE_UNAVAILABLE when getSqliteClient returns null', async () => {
       // Use a temp directory that will cause SQLite initialization to fail
       // by mocking getSqliteClient to return null
-      const originalGetSqliteClient = getSqliteClient;
+      const _originalGetSqliteClient = getSqliteClient;
 
       // Create a spy by temporarily patching
       const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'empty-search-test-'));
@@ -480,10 +449,7 @@ describe('bus_search unit tests', () => {
       closeSqliteClient(emptyDir);
 
       try {
-        const result = await busSearchExecute(
-          { query: 'anything' },
-          { directory: emptyDir }
-        );
+        const result = await busSearchExecute({ query: 'anything' }, { directory: emptyDir });
 
         // Since getSqliteClient will create a new client for this empty dir,
         // it should succeed unless we can force it to fail

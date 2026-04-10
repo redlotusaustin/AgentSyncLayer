@@ -7,11 +7,15 @@
  * - updateLastSeenTimestamp: Writing timestamps to Redis
  */
 
-import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import { createTestContext, generateTestAgentId, type TestContext } from '../helpers';
-import { buildLastSeenKey, getLastSeenTimestamp, updateLastSeenTimestamp } from '../../src/tools/notifications';
-import { resetRedisClient, setRedisClient } from '../../src/redis';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { RedisClient } from '../../src/redis';
+import { resetRedisClient, setRedisClient } from '../../src/redis';
+import {
+  buildLastSeenKey,
+  getLastSeenTimestamp,
+  updateLastSeenTimestamp,
+} from '../../src/tools/notifications';
+import { createTestContext, generateTestAgentId, type TestContext } from '../helpers';
 
 // TTL constant used by notifications module
 const EXPECTED_TTL_SECONDS = 86400; // 24 hours

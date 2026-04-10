@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { RateLimiter } from '../../src/rate-limiter';
 import { RateLimitException } from '../../src/validation';
 
@@ -218,4 +218,3 @@ describe('RateLimiter', () => {
     });
   });
 });
-

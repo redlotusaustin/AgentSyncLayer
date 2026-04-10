@@ -14,23 +14,14 @@
  * - T5.10: handles empty database
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach, jest } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import {
-  getSqliteClient,
-  closeSqliteClient,
-  SqliteClient,
-} from '../../src/sqlite';
-import {
-  RedisClient,
-  getRedisClient,
-  setRedisClient,
-  resetRedisClient,
-} from '../../src/redis';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { hashProjectPath } from '../../src/namespace';
+import { RedisClient, resetRedisClient, setRedisClient } from '../../src/redis';
 import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
 import { busHistoryExecute } from '../../src/tools/bus_history';
 import type { Message, ToolContext } from '../../src/types';
 
@@ -114,17 +105,19 @@ describe('bus_history unit tests', () => {
       // Insert 100 messages with decreasing timestamps
       for (let i = 0; i < 100; i++) {
         const timestamp = new Date(Date.now() - (100 - i) * 1000).toISOString();
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `msg-${i}`,
-          timestamp,
-          payload: { text: `Message ${i}` },
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `msg-${i}`,
+            timestamp,
+            payload: { text: `Message ${i}` },
+          }),
+        );
       }
 
       const result = await busHistoryExecute(
         { channel: 'general', page: 1, per_page: 10 },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
@@ -148,17 +141,16 @@ describe('bus_history unit tests', () => {
       ];
 
       for (let i = 0; i < 3; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `msg-time-${i}`,
-          timestamp: timestamps[i],
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `msg-time-${i}`,
+            timestamp: timestamps[i],
+          }),
+        );
       }
 
-      const result = await busHistoryExecute(
-        { channel: 'general' },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general' }, testContext);
 
       expect(result.ok).toBe(true);
       // Newest should be first
@@ -173,17 +165,19 @@ describe('bus_history unit tests', () => {
       // Insert 100 messages with different timestamps to ensure proper ordering
       for (let i = 0; i < 100; i++) {
         const timestamp = new Date(Date.now() - (100 - i) * 1000).toISOString();
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `msg-page2-${i}`,
-          timestamp,
-          payload: { text: `Message ${i}` },
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `msg-page2-${i}`,
+            timestamp,
+            payload: { text: `Message ${i}` },
+          }),
+        );
       }
 
       const result = await busHistoryExecute(
         { channel: 'general', page: 2, per_page: 10 },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
@@ -202,22 +196,23 @@ describe('bus_history unit tests', () => {
 
       // Insert messages across different channels
       for (let i = 0; i < 5; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `general-msg-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `general-msg-${i}`,
+          }),
+        );
       }
       for (let i = 0; i < 3; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'claims',
-          id: `claims-msg-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'claims',
+            id: `claims-msg-${i}`,
+          }),
+        );
       }
 
-      const result = await busHistoryExecute(
-        { channel: 'general', per_page: 20 },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general', per_page: 20 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(5);
@@ -232,23 +227,24 @@ describe('bus_history unit tests', () => {
 
       // Insert 10 messages to 'random' channel
       for (let i = 0; i < 10; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'random',
-          id: `random-msg-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'random',
+            id: `random-msg-${i}`,
+          }),
+        );
       }
       // Also insert 5 to another channel
       for (let i = 0; i < 5; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'other',
-          id: `other-msg-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'other',
+            id: `other-msg-${i}`,
+          }),
+        );
       }
 
-      const result = await busHistoryExecute(
-        { channel: 'random', per_page: 20 },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'random', per_page: 20 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(10);
@@ -264,15 +260,12 @@ describe('bus_history unit tests', () => {
       sqlite!.insertMessage(createTestMessage(projectHash, { channel: 'ch2' }));
       sqlite!.insertMessage(createTestMessage(projectHash, { channel: 'ch3' }));
 
-      const result = await busHistoryExecute(
-        { per_page: 20 },
-        testContext
-      );
+      const result = await busHistoryExecute({ per_page: 20 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(3);
       expect(result.data!.total).toBe(3);
-      const channels = result.data!.messages.map(m => m.channel);
+      const channels = result.data!.messages.map((m) => m.channel);
       expect(channels).toContain('ch1');
       expect(channels).toContain('ch2');
       expect(channels).toContain('ch3');
@@ -284,15 +277,17 @@ describe('bus_history unit tests', () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
       for (let i = 0; i < 25; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `total-test-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `total-test-${i}`,
+          }),
+        );
       }
 
       const result = await busHistoryExecute(
         { channel: 'general', page: 1, per_page: 10 },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
@@ -304,16 +299,15 @@ describe('bus_history unit tests', () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
       for (let i = 0; i < 31; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `ceil-test-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `ceil-test-${i}`,
+          }),
+        );
       }
 
-      const result = await busHistoryExecute(
-        { channel: 'general', per_page: 10 },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general', per_page: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.total_pages).toBe(4); // ceil(31/10) = 4
@@ -323,16 +317,15 @@ describe('bus_history unit tests', () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
       for (let i = 0; i < 5; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `single-page-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `single-page-${i}`,
+          }),
+        );
       }
 
-      const result = await busHistoryExecute(
-        { channel: 'general', per_page: 10 },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general', per_page: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.total_pages).toBe(1);
@@ -344,15 +337,17 @@ describe('bus_history unit tests', () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
       for (let i = 0; i < 5; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `beyond-range-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `beyond-range-${i}`,
+          }),
+        );
       }
 
       const result = await busHistoryExecute(
         { channel: 'general', page: 10, per_page: 10 },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
@@ -367,16 +362,15 @@ describe('bus_history unit tests', () => {
       const sqlite = getSqliteClient(testDir.dir, projectHash);
 
       for (let i = 0; i < 60; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          id: `defaults-test-${i}`,
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            id: `defaults-test-${i}`,
+          }),
+        );
       }
 
-      const result = await busHistoryExecute(
-        { channel: 'general' },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.page).toBe(1);
@@ -385,10 +379,7 @@ describe('bus_history unit tests', () => {
     });
 
     test('page defaults to 1 even when negative', async () => {
-      const result = await busHistoryExecute(
-        { channel: 'general', page: -5 },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general', page: -5 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.page).toBe(1);
@@ -397,30 +388,21 @@ describe('bus_history unit tests', () => {
 
   describe('T5.8: validates per_page range', () => {
     test('per_page=0 returns error', async () => {
-      const result = await busHistoryExecute(
-        { channel: 'general', per_page: 0 },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general', per_page: 0 }, testContext);
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('LIMIT_INVALID');
     });
 
     test('per_page=101 returns error (out of range)', async () => {
-      const result = await busHistoryExecute(
-        { channel: 'general', per_page: 101 },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general', per_page: 101 }, testContext);
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('LIMIT_INVALID');
     });
 
     test('per_page=100 is valid', async () => {
-      const result = await busHistoryExecute(
-        { channel: 'general', per_page: 100 },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general', per_page: 100 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.per_page).toBe(100);
@@ -442,10 +424,7 @@ describe('bus_history unit tests', () => {
         // We test by calling with a directory that doesn't exist in singleton map
         const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'empty-test-'));
         try {
-          const result = await busHistoryExecute(
-            { channel: 'general' },
-            { directory: emptyDir }
-          );
+          const result = await busHistoryExecute({ channel: 'general' }, { directory: emptyDir });
 
           // Should return error since no SQLite client exists for this directory
           // (Unless something goes wrong during hash computation)
@@ -465,10 +444,7 @@ describe('bus_history unit tests', () => {
     test('returns empty array with total=0', async () => {
       // No messages inserted - database is empty
 
-      const result = await busHistoryExecute(
-        { channel: 'general' },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'general' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.messages).toEqual([]);
@@ -480,10 +456,7 @@ describe('bus_history unit tests', () => {
     });
 
     test('empty for non-existent channel', async () => {
-      const result = await busHistoryExecute(
-        { channel: 'non-existent-channel' },
-        testContext
-      );
+      const result = await busHistoryExecute({ channel: 'non-existent-channel' }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.messages).toEqual([]);

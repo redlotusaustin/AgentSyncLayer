@@ -5,7 +5,7 @@
  * All test data uses realistic-looking IDs and timestamps.
  */
 
-import type { Message, MessageType, MessagePayload } from '../src/types';
+import type { Message, MessagePayload, MessageType } from '../src/types';
 
 /**
  * Default values for test messages
@@ -52,7 +52,7 @@ export function createTestMessages(
   count: number,
   channel = 'general',
   baseTimestamp = Date.now() - count * 1000,
-  projectHash = DEFAULT_PROJECT_HASH
+  projectHash = DEFAULT_PROJECT_HASH,
 ): Message[] {
   return Array.from({ length: count }, (_, i) => {
     const timestamp = baseTimestamp + i * 1000;
@@ -79,7 +79,7 @@ export function createTestMessages(
  */
 export function createSearchableMessage(
   searchTerm: string,
-  overrides: Partial<Message> = {}
+  overrides: Partial<Message> = {},
 ): Message {
   return createTestMessage({
     payload: { text: `Message about ${searchTerm} and related topics` } as MessagePayload,
@@ -101,7 +101,7 @@ export function createSearchableMessage(
 export function createMessagesFromMultipleAgents(
   agents: string[],
   messagesPerAgent: number,
-  channel = 'general'
+  channel = 'general',
 ): Message[] {
   const allMessages: Message[] = [];
   for (const agentId of agents) {
@@ -113,7 +113,7 @@ export function createMessagesFromMultipleAgents(
           channel,
           payload: { text: `Message from ${agentId} #${i}` } as MessagePayload,
           timestamp: new Date(Date.now() + allMessages.length * 100).toISOString(),
-        })
+        }),
       );
     }
   }
@@ -153,7 +153,7 @@ export function createTestProjectHash(): string {
  */
 export function createTestToolContext(
   directory: string,
-  worktree?: string
+  worktree?: string,
 ): { directory: string; worktree?: string } {
   return {
     directory,

@@ -12,26 +12,25 @@
  * fallback behavior instead.
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
+import { busChannelsExecute } from '../../src/tools/bus_channels';
+import { busHistoryExecute } from '../../src/tools/bus_history';
+import { busReadExecute } from '../../src/tools/bus_read';
+import { busSearchExecute } from '../../src/tools/bus_search';
+import { busSendExecute } from '../../src/tools/bus_send';
+import type { Message } from '../../src/types';
+import { createTestMessage } from '../fixtures';
 import {
   createTestContext,
-  createTestRedisClient,
-  getTestProjectHash,
   generateTestAgentId,
+  getTestProjectHash,
   isRedisAvailable,
 } from '../helpers';
-import { createTestMessage } from '../fixtures';
-import { getSqliteClient, closeSqliteClient } from '../../src/sqlite';
-import { busSendExecute } from '../../src/tools/bus_send';
-import { busReadExecute } from '../../src/tools/bus_read';
-import { busHistoryExecute } from '../../src/tools/bus_history';
-import { busSearchExecute } from '../../src/tools/bus_search';
-import { busChannelsExecute } from '../../src/tools/bus_channels';
-import { setSessionAgentId, resetSessionAgentId } from '../../src/session';
-import type { Message } from '../../src/types';
 
 describe('T11: Graceful Degradation', () => {
   const ctx = createTestContext();
@@ -85,7 +84,7 @@ describe('T11: Graceful Degradation', () => {
       // bus_send should still work (Redis-only)
       const sendResult = await busSendExecute(
         { channel, message: 'Redis-only message' },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       // Should succeed because Redis is available
@@ -104,10 +103,7 @@ describe('T11: Graceful Degradation', () => {
       await ctx.redis.sadd(`opencode:${projectHash}:channels`, channelB);
 
       // bus_channels should work
-      const result = await busChannelsExecute(
-        {},
-        { directory: testDir }
-      );
+      const result = await busChannelsExecute({}, { directory: testDir });
 
       expect(result.ok).toBe(true);
       expect(result.data!.channels.length).toBeGreaterThanOrEqual(2);
@@ -138,13 +134,13 @@ describe('T11: Graceful Degradation', () => {
       // bus_history should work (SQLite-only)
       const historyResult = await busHistoryExecute(
         { channel, page: 1, per_page: 50 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(historyResult.ok).toBe(true);
       // Find our messages by checking if there are any messages for this channel
-      const ourMessages = historyResult.data!.messages.filter(
-        (m) => m.id.startsWith(`sqlite-only-msg-${testCounter}`)
+      const ourMessages = historyResult.data!.messages.filter((m) =>
+        m.id.startsWith(`sqlite-only-msg-${testCounter}`),
       );
       expect(ourMessages.length).toBe(3);
     });
@@ -173,13 +169,13 @@ describe('T11: Graceful Degradation', () => {
       // bus_search should work
       const searchResult = await busSearchExecute(
         { query: uniqueTerm, limit: 20 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       expect(searchResult.ok).toBe(true);
       // Should find our messages
-      const ourResults = searchResult.data!.results.filter(
-        (r) => r.message.id.startsWith(`search-msg-${testCounter}`)
+      const ourResults = searchResult.data!.results.filter((r) =>
+        r.message.id.startsWith(`search-msg-${testCounter}`),
       );
       expect(ourResults.length).toBe(5);
     });
@@ -203,14 +199,11 @@ describe('T11: Graceful Degradation', () => {
       await ctx.redis.flushdb();
 
       // bus_read should fall back to SQLite
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
 
       expect(readResult.ok).toBe(true);
       const ourMessage = readResult.data!.messages.find(
-        (m) => m.id === `fallback-msg-${testCounter}`
+        (m) => m.id === `fallback-msg-${testCounter}`,
       );
       expect(ourMessage).toBeDefined();
       expect(ourMessage!.payload.text).toBe('Fallback test message');
@@ -237,15 +230,10 @@ describe('T11: Graceful Degradation', () => {
       await ctx.redis.flushdb();
 
       // bus_read should return from SQLite
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
 
       expect(readResult.ok).toBe(true);
-      const ourMessage = readResult.data!.messages.find(
-        (m) => m.id === `test-msg-${testCounter}`
-      );
+      const ourMessage = readResult.data!.messages.find((m) => m.id === `test-msg-${testCounter}`);
       expect(ourMessage).toBeDefined();
     });
 
@@ -255,7 +243,7 @@ describe('T11: Graceful Degradation', () => {
       // bus_history should work (relies on SQLite)
       const historyResult = await busHistoryExecute(
         { channel, page: 1, per_page: 50 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       // Should return successfully (even if empty)
@@ -266,10 +254,7 @@ describe('T11: Graceful Degradation', () => {
       const query = `t11-3c-${testCounter}`;
 
       // bus_search should work
-      const searchResult = await busSearchExecute(
-        { query },
-        { directory: testDir }
-      );
+      const searchResult = await busSearchExecute({ query }, { directory: testDir });
 
       // Should return successfully (even if no results)
       expect(searchResult.ok).toBe(true);
@@ -289,18 +274,18 @@ describe('T11: Graceful Degradation', () => {
             channel,
             payload: { text: 'Message during SQLite-only period' },
             project: projectHash,
-          })
+          }),
         );
       }
 
       // Verify bus_history works with SQLite
       const historyBefore = await busHistoryExecute(
         { channel, page: 1, per_page: 50 },
-        { directory: testDir }
+        { directory: testDir },
       );
       expect(historyBefore.ok).toBe(true);
       const ourMsg = historyBefore.data!.messages.find(
-        (m) => m.id === `pre-reconnect-${testCounter}`
+        (m) => m.id === `pre-reconnect-${testCounter}`,
       );
       expect(ourMsg).toBeDefined();
 
@@ -310,7 +295,7 @@ describe('T11: Graceful Degradation', () => {
       // Step 3: Send new message (goes to both Redis and SQLite)
       const sendResult = await busSendExecute(
         { channel, message: 'After reconnection' },
-        { directory: testDir }
+        { directory: testDir },
       );
       expect(sendResult.ok).toBe(true);
 
@@ -322,19 +307,16 @@ describe('T11: Graceful Degradation', () => {
       // SQLite (via bus_history) should have both messages
       const historyAfter = await busHistoryExecute(
         { channel, page: 1, per_page: 50 },
-        { directory: testDir }
+        { directory: testDir },
       );
       expect(historyAfter.ok).toBe(true);
       const afterMsg = historyAfter.data!.messages.find(
-        (m) => m.payload.text === 'After reconnection'
+        (m) => m.payload.text === 'After reconnection',
       );
       expect(afterMsg).toBeDefined();
 
       // bus_read should find message (uses Redis first)
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
       expect(readResult.ok).toBe(true);
       expect(readResult.data!.messages.length).toBe(1); // From Redis cache
       expect(readResult.data!.messages[0].payload.text).toBe('After reconnection');
@@ -356,15 +338,12 @@ describe('T11: Graceful Degradation', () => {
             channel,
             payload: { text: 'New message after timestamp check' },
             project: projectHash,
-          })
+          }),
         );
       }
 
       // Update last-seen via bus_read
-      await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      await busReadExecute({ channel, limit: 10 }, { directory: testDir });
 
       // Verify timestamp was updated in Redis
       const timestamp = await ctx.redis.get(lastSeenKey);

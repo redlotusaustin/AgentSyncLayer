@@ -8,24 +8,23 @@
  * Tests will skip gracefully if Redis is not running.
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
+import { busListenExecute } from '../../src/tools/bus_listen';
+import { busReadExecute } from '../../src/tools/bus_read';
+import { busSendExecute } from '../../src/tools/bus_send';
+import type { Message } from '../../src/types';
+import { createTestMessage } from '../fixtures';
 import {
   createTestContext,
-  createTestRedisClient,
-  getTestProjectHash,
   generateTestAgentId,
+  getTestProjectHash,
   isRedisAvailable,
 } from '../helpers';
-import { createTestMessage } from '../fixtures';
-import { getSqliteClient, closeSqliteClient } from '../../src/sqlite';
-import { busSendExecute } from '../../src/tools/bus_send';
-import { busReadExecute } from '../../src/tools/bus_read';
-import { busListenExecute } from '../../src/tools/bus_listen';
-import { setSessionAgentId, resetSessionAgentId } from '../../src/session';
-import type { Message } from '../../src/types';
 
 describe('T9: Fallback Behavior', () => {
   const ctx = createTestContext();
@@ -78,7 +77,7 @@ describe('T9: Fallback Behavior', () => {
       for (let i = 0; i < 5; i++) {
         const result = await busSendExecute(
           { channel, message: `Message ${i}` },
-          { directory: testDir }
+          { directory: testDir },
         );
         expect(result.ok).toBe(true);
         messageIds.push(result.data!.id);
@@ -97,10 +96,7 @@ describe('T9: Fallback Behavior', () => {
       expect(emptyCount).toBe(0);
 
       // bus_read should now fall back to SQLite
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
 
       expect(readResult.ok).toBe(true);
       expect(readResult.data).toBeDefined();
@@ -134,10 +130,7 @@ describe('T9: Fallback Behavior', () => {
       await ctx.redis.sadd(channelsKey, channel);
 
       // bus_read should use Redis (fast path)
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
 
       expect(readResult.ok).toBe(true);
       expect(readResult.data!.messages.length).toBe(1);
@@ -150,16 +143,13 @@ describe('T9: Fallback Behavior', () => {
       // Send a message (goes to both stores)
       const sendResult = await busSendExecute(
         { channel, message: 'Message in both stores' },
-        { directory: testDir }
+        { directory: testDir },
       );
       expect(sendResult.ok).toBe(true);
       const messageId = sendResult.data!.id;
 
       // Read back
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
 
       expect(readResult.ok).toBe(true);
       const ourMessage = readResult.data!.messages.find((m) => m.id === messageId);
@@ -196,13 +186,13 @@ describe('T9: Fallback Behavior', () => {
 
       const listenResult = await busListenExecute(
         { channels: [channel], timeout: 2 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       // bus_listen should succeed (not return BUS_UNAVAILABLE)
       expect(listenResult.ok).toBe(true);
       expect(listenResult.data).toBeDefined();
-      
+
       expect(listenResult.data!.timeout).toBe(true);
     });
 
@@ -215,12 +205,12 @@ describe('T9: Fallback Behavior', () => {
 
       const listenResult = await busListenExecute(
         { channels: [channel], timeout: 1 },
-        { directory: testDir }
+        { directory: testDir },
       );
 
       // Should complete successfully (timeout is expected)
       expect(listenResult.ok).toBe(true);
-      
+
       expect(listenResult.data!.timeout).toBe(true);
     });
   });

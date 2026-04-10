@@ -1,13 +1,13 @@
-import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import { Database } from 'bun:sqlite';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
+  closeSqliteClient,
+  getSqliteClient,
   SqliteClient,
   SqliteInitializationError,
-  getSqliteClient,
-  closeSqliteClient,
 } from '../../src/sqlite';
 import type { Message } from '../../src/types';
 
@@ -48,17 +48,23 @@ describe('T1.1: initializes database with correct schema', () => {
   afterAll(cleanup);
 
   test('creates messages table', () => {
-    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'").get();
+    const result = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'")
+      .get();
     expect(result).toBeDefined();
   });
 
   test('creates channels table', () => {
-    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='channels'").get();
+    const result = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='channels'")
+      .get();
     expect(result).toBeDefined();
   });
 
   test('creates FTS5 virtual table', () => {
-    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='messages_fts'").get();
+    const result = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='messages_fts'")
+      .get();
     expect(result).toBeDefined();
   });
 
@@ -131,7 +137,7 @@ describe('T1.4: insertMessage ignores duplicate IDs', () => {
 describe('T1.5: insertMessage upserts channel count', () => {
   const { db, dir, cleanup } = createTestSqliteDb();
   let client: SqliteClient;
-  const projectHash = 'a1b2c3d4e5f6';
+  const _projectHash = 'a1b2c3d4e5f6';
 
   beforeAll(() => {
     client = new SqliteClient(dir);
@@ -143,7 +149,9 @@ describe('T1.5: insertMessage upserts channel count', () => {
     client.insertMessage(createTestMessage({ channel: 'upsert-test' }));
     client.insertMessage(createTestMessage({ channel: 'upsert-test' }));
 
-    const result = db.prepare('SELECT message_count FROM channels WHERE name = ?').get('upsert-test') as { message_count: number };
+    const result = db
+      .prepare('SELECT message_count FROM channels WHERE name = ?')
+      .get('upsert-test') as { message_count: number };
     expect(result.message_count).toBe(3);
   });
 });
@@ -173,7 +181,7 @@ describe('T1.6: getMessages with channel filter', () => {
       offset: 0,
     });
     expect(messages.length).toBe(5);
-    messages.forEach(msg => {
+    messages.forEach((msg) => {
       expect(msg.channel).toBe('channel-a');
     });
   });
@@ -244,16 +252,22 @@ describe('T1.9: getMessagesSince returns only newer messages', () => {
   test('returns only messages after sinceUnixMs', () => {
     const baseTime = (globalThis as any).__testBaseTime as number;
     // Insert messages with explicit timestamps relative to baseTime
-    client.insertMessage(createTestMessage({ id: 'msg-since-1', timestamp: new Date(baseTime).toISOString() }));
-    client.insertMessage(createTestMessage({ id: 'msg-since-2', timestamp: new Date(baseTime + 1000).toISOString() }));
-    client.insertMessage(createTestMessage({ id: 'msg-since-3', timestamp: new Date(baseTime + 2000).toISOString() }));
+    client.insertMessage(
+      createTestMessage({ id: 'msg-since-1', timestamp: new Date(baseTime).toISOString() }),
+    );
+    client.insertMessage(
+      createTestMessage({ id: 'msg-since-2', timestamp: new Date(baseTime + 1000).toISOString() }),
+    );
+    client.insertMessage(
+      createTestMessage({ id: 'msg-since-3', timestamp: new Date(baseTime + 2000).toISOString() }),
+    );
 
     // Query for messages after baseTime + 500
     const sinceTime = baseTime + 500;
     const messages = client.getMessagesSince({ projectHash, sinceUnixMs: sinceTime });
     // Should return messages at baseTime+1000 and baseTime+2000
     expect(messages.length).toBe(2);
-    const ids = messages.map(m => m.id);
+    const ids = messages.map((m) => m.id);
     expect(ids).toContain('msg-since-2');
     expect(ids).toContain('msg-since-3');
   });
@@ -287,14 +301,18 @@ describe('T1.11: searchMessages finds matching text', () => {
 
   beforeAll(() => {
     client = new SqliteClient(dir);
-    client.insertMessage(createTestMessage({
-      id: 'msg-search-1',
-      payload: { text: 'implement authentication' },
-    }));
-    client.insertMessage(createTestMessage({
-      id: 'msg-search-2',
-      payload: { text: 'fix database connection' },
-    }));
+    client.insertMessage(
+      createTestMessage({
+        id: 'msg-search-1',
+        payload: { text: 'implement authentication' },
+      }),
+    );
+    client.insertMessage(
+      createTestMessage({
+        id: 'msg-search-2',
+        payload: { text: 'fix database connection' },
+      }),
+    );
   });
   afterAll(cleanup);
 
@@ -312,16 +330,20 @@ describe('T1.12: searchMessages with channel filter', () => {
 
   beforeAll(() => {
     client = new SqliteClient(dir);
-    client.insertMessage(createTestMessage({
-      id: 'msg-ch-filter-1',
-      channel: 'general',
-      payload: { text: 'search query match' },
-    }));
-    client.insertMessage(createTestMessage({
-      id: 'msg-ch-filter-2',
-      channel: 'claims',
-      payload: { text: 'search query match' },
-    }));
+    client.insertMessage(
+      createTestMessage({
+        id: 'msg-ch-filter-1',
+        channel: 'general',
+        payload: { text: 'search query match' },
+      }),
+    );
+    client.insertMessage(
+      createTestMessage({
+        id: 'msg-ch-filter-2',
+        channel: 'claims',
+        payload: { text: 'search query match' },
+      }),
+    );
   });
   afterAll(cleanup);
 
@@ -339,10 +361,12 @@ describe('T1.13: searchMessages returns snippet', () => {
 
   beforeAll(() => {
     client = new SqliteClient(dir);
-    client.insertMessage(createTestMessage({
-      id: 'msg-snippet-1',
-      payload: { text: 'this is a test message with matching text inside' },
-    }));
+    client.insertMessage(
+      createTestMessage({
+        id: 'msg-snippet-1',
+        payload: { text: 'this is a test message with matching text inside' },
+      }),
+    );
   });
   afterAll(cleanup);
 
@@ -361,14 +385,18 @@ describe('T1.14: searchMessages ranks by relevance', () => {
 
   beforeAll(() => {
     client = new SqliteClient(dir);
-    client.insertMessage(createTestMessage({
-      id: 'msg-rank-1',
-      payload: { text: 'error handling error recovery' }, // 2 occurrences
-    }));
-    client.insertMessage(createTestMessage({
-      id: 'msg-rank-2',
-      payload: { text: 'error handling' }, // 1 occurrence
-    }));
+    client.insertMessage(
+      createTestMessage({
+        id: 'msg-rank-1',
+        payload: { text: 'error handling error recovery' }, // 2 occurrences
+      }),
+    );
+    client.insertMessage(
+      createTestMessage({
+        id: 'msg-rank-2',
+        payload: { text: 'error handling' }, // 1 occurrence
+      }),
+    );
   });
   afterAll(cleanup);
 
@@ -388,10 +416,12 @@ describe('T1.15: searchMessages sanitizes FTS5 query', () => {
 
   beforeAll(() => {
     client = new SqliteClient(dir);
-    client.insertMessage(createTestMessage({
-      id: 'msg-sanitize',
-      payload: { text: 'this is a normal test message' },
-    }));
+    client.insertMessage(
+      createTestMessage({
+        id: 'msg-sanitize',
+        payload: { text: 'this is a normal test message' },
+      }),
+    );
   });
   afterAll(cleanup);
 

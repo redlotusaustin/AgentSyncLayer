@@ -7,9 +7,9 @@
  * Uses SCAN for production safety (non-blocking).
  */
 
-import { describe, expect, test, beforeAll } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
+import { beforeAll, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 // Path to bus-monitor.ts source file
 const BUS_MONITOR_PATH = path.resolve(__dirname, '../../bus-monitor.ts');
@@ -48,8 +48,8 @@ describe('T9: bus-monitor uses SCAN not KEYS', () => {
     const lines = sourceContent.split('\n');
 
     // Find all lines with Redis key operations
-    const keyOperationLines = lines.filter(line =>
-      line.includes('.keys') || line.includes('.scan') || line.includes('MATCH')
+    const keyOperationLines = lines.filter(
+      (line) => line.includes('.keys') || line.includes('.scan') || line.includes('MATCH'),
     );
 
     // Each Redis key iteration should use SCAN pattern
@@ -65,11 +65,11 @@ describe('T9: bus-monitor uses SCAN not KEYS', () => {
     // Verify the agentKeys SCAN block exists
     expect(sourceContent).toContain('const agentKeys: string[] = []');
     expect(sourceContent).toContain('.scan(');
-    expect(sourceContent).toContain("agent:");
+    expect(sourceContent).toContain('agent:');
 
     // Verify the lsKeys SCAN block exists
     expect(sourceContent).toContain('const lsKeys: string[] = []');
-    expect(sourceContent).toContain("lastseen:");
+    expect(sourceContent).toContain('lastseen:');
   });
 
   test('T9: production safety check - no blocking KEYS command', () => {

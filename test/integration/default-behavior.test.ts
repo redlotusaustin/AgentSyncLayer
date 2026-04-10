@@ -7,24 +7,16 @@
  * Tests: I3.1
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import {
-  createTestContext,
-  isRedisAvailable,
-  generateTestAgentId,
-} from '../helpers';
-import {
-  busSendExecute,
-  busReadExecute,
-  cleanupRateLimiter,
-} from '../../src/tools';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { resetBusConfig, resolveBusConfig } from '../../src/config';
 import { hashProjectPath } from '../../src/namespace';
-import { getSessionAgentId, setSessionAgentId } from '../../src/session';
-import { getSqliteClient, closeSqliteClient } from '../../src/sqlite';
+import { setSessionAgentId } from '../../src/session';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
+import { busReadExecute, busSendExecute, cleanupRateLimiter } from '../../src/tools';
+import { createTestContext, generateTestAgentId, isRedisAvailable } from '../helpers';
 
 /**
  * Create a clean test directory with no config files
@@ -38,7 +30,11 @@ function createCleanTestDir(): {
   return {
     dir,
     cleanup: () => {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
     },
   };
 }
@@ -144,7 +140,7 @@ describe('I3: Default Behavior', () => {
 
         const sendResult = await busSendExecute(
           { channel: 'general', message: 'Message without config' },
-          { directory: dir }
+          { directory: dir },
         );
 
         expect(sendResult.ok).toBe(true);
@@ -156,13 +152,11 @@ describe('I3: Default Behavior', () => {
         // Read messages and verify project matches
         const readResult = await busReadExecute(
           { channel: 'general', limit: 10 },
-          { directory: dir }
+          { directory: dir },
         );
 
         expect(readResult.ok).toBe(true);
-        const ourMessage = readResult.data!.messages.find(
-          (m) => m.from === agentId
-        );
+        const ourMessage = readResult.data!.messages.find((m) => m.from === agentId);
         expect(ourMessage).toBeDefined();
         expect(ourMessage!.project).toBe(config.projectHash);
       } finally {
@@ -227,47 +221,33 @@ describe('I3: Default Behavior', () => {
         setSessionAgentId(agent1Id);
         await busSendExecute(
           { channel: 'general', message: 'Message from dir1' },
-          { directory: dir1 }
+          { directory: dir1 },
         );
 
         // Send from dir2
         setSessionAgentId(agent2Id);
         await busSendExecute(
           { channel: 'general', message: 'Message from dir2' },
-          { directory: dir2 }
+          { directory: dir2 },
         );
 
         // Read from dir1 - should only see dir1's message
         setSessionAgentId(agent1Id);
-        const read1 = await busReadExecute(
-          { channel: 'general', limit: 10 },
-          { directory: dir1 }
-        );
+        const read1 = await busReadExecute({ channel: 'general', limit: 10 }, { directory: dir1 });
 
         expect(read1.ok).toBe(true);
-        const msg1 = read1.data!.messages.find(
-          (m) => m.from === agent1Id
-        );
-        const msg2 = read1.data!.messages.find(
-          (m) => m.from === agent2Id
-        );
+        const msg1 = read1.data!.messages.find((m) => m.from === agent1Id);
+        const msg2 = read1.data!.messages.find((m) => m.from === agent2Id);
         expect(msg1).toBeDefined();
         expect(msg2).toBeUndefined(); // dir2's message should not be visible
 
         // Read from dir2 - should only see dir2's message
         setSessionAgentId(agent2Id);
-        const read2 = await busReadExecute(
-          { channel: 'general', limit: 10 },
-          { directory: dir2 }
-        );
+        const read2 = await busReadExecute({ channel: 'general', limit: 10 }, { directory: dir2 });
 
         expect(read2.ok).toBe(true);
-        const msg3 = read2.data!.messages.find(
-          (m) => m.from === agent2Id
-        );
-        const msg4 = read2.data!.messages.find(
-          (m) => m.from === agent1Id
-        );
+        const msg3 = read2.data!.messages.find((m) => m.from === agent2Id);
+        const msg4 = read2.data!.messages.find((m) => m.from === agent1Id);
         expect(msg3).toBeDefined();
         expect(msg4).toBeUndefined(); // dir1's message should not be visible
       } finally {

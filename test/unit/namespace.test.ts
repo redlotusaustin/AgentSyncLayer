@@ -1,15 +1,10 @@
-import { describe, expect, test, beforeAll } from 'bun:test';
-import {
-  hashProjectPath,
-  buildKey,
-  KeyBuilder,
-  createKeyBuilder,
-} from '../../src/namespace';
-import * as fs from 'fs';
-import * as path from 'path';
+import { beforeAll, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { buildKey, createKeyBuilder, hashProjectPath, KeyBuilder } from '../../src/namespace';
 
 // Test directory for hash tests - use /tmp for Bun compatibility
-const testDir = path.join('/tmp', 'agentsynclayer-test-' + Date.now());
+const testDir = path.join('/tmp', `agentsynclayer-test-${Date.now()}`);
 
 beforeAll(() => {
   fs.mkdirSync(testDir, { recursive: true });
@@ -48,15 +43,21 @@ describe('buildKey', () => {
   });
 
   test('builds history key', () => {
-    expect(buildKey(projectHash, 'history', 'general')).toBe('opencode:a1b2c3d4e5f6:history:general');
+    expect(buildKey(projectHash, 'history', 'general')).toBe(
+      'opencode:a1b2c3d4e5f6:history:general',
+    );
   });
 
   test('builds agent key', () => {
-    expect(buildKey(projectHash, 'agent', 'devbox-1234-abcd')).toBe('opencode:a1b2c3d4e5f6:agent:devbox-1234-abcd');
+    expect(buildKey(projectHash, 'agent', 'devbox-1234-abcd')).toBe(
+      'opencode:a1b2c3d4e5f6:agent:devbox-1234-abcd',
+    );
   });
 
   test('builds claim key', () => {
-    expect(buildKey(projectHash, 'claim', 'src/index.ts')).toBe('opencode:a1b2c3d4e5f6:claim:src/index.ts');
+    expect(buildKey(projectHash, 'claim', 'src/index.ts')).toBe(
+      'opencode:a1b2c3d4e5f6:claim:src/index.ts',
+    );
   });
 
   test('builds channels set key', () => {
@@ -95,7 +96,9 @@ describe('KeyBuilder', () => {
   });
 
   test('builds claim key', () => {
-    expect(builder.claim('src/auth/login.ts')).toBe('opencode:a1b2c3d4e5f6:claim:src/auth/login.ts');
+    expect(builder.claim('src/auth/login.ts')).toBe(
+      'opencode:a1b2c3d4e5f6:claim:src/auth/login.ts',
+    );
   });
 
   test('builds channels key', () => {
@@ -107,4 +110,3 @@ describe('KeyBuilder', () => {
     expect(builder.pattern('claim', '*.ts')).toBe('opencode:a1b2c3d4e5f6:claim:*.ts');
   });
 });
-

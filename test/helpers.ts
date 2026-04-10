@@ -6,12 +6,12 @@
  */
 
 import { Database } from 'bun:sqlite';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import Redis from 'ioredis';
-import type { RedisClient } from '../src/redis';
 import { resetBusConfig } from '../src/config';
+import type { RedisClient } from '../src/redis';
 
 // Test Redis configuration - use DB 15 for isolation
 const TEST_REDIS_URL = process.env.AGENTSYNCLAYER_REDIS_URL ?? 'redis://localhost:6379';
@@ -181,7 +181,7 @@ export function generateTestAgentId(suffix?: string): string {
 export async function waitFor(
   condition: () => Promise<boolean>,
   timeoutMs = 5000,
-  intervalMs = 50
+  intervalMs = 50,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
 
@@ -237,17 +237,16 @@ export class MockTime {
   }
 
   start(): void {
-    const self = this;
-    Date.now = () => self.currentTime;
+    Date.now = () => this.currentTime;
     globalThis.setTimeout = ((callback: () => void, duration?: number) => {
-      const id = ++self.timerId;
+      const id = ++this.timerId;
       if (duration !== undefined) {
-        self.timers.set(id, { callback, duration });
+        this.timers.set(id, { callback, duration });
         // Auto-fire timer
-        self.originalSetTimeout(() => {
-          if (self.timers.has(id)) {
-            self.timers.delete(id);
-            self.currentTime += duration;
+        this.originalSetTimeout(() => {
+          if (this.timers.has(id)) {
+            this.timers.delete(id);
+            this.currentTime += duration;
             callback();
           }
         }, 0);
@@ -281,7 +280,7 @@ export class MockTime {
 /**
  * SQLite test database configuration
  */
-const TEST_DB_PATH = '.agentsynclayer/history.db';
+const _TEST_DB_PATH = '.agentsynclayer/history.db';
 
 /**
  * Create a test SQLite database in a temporary directory
@@ -462,9 +461,7 @@ export function initializeTestSqliteSchema(db: Database): void {
 // ============================================================================
 // Config test helpers
 // ============================================================================
-export function createTestBusEnv(
-  config?: Record<string, string>
-): {
+export function createTestBusEnv(config?: Record<string, string>): {
   root: string;
   cleanup: () => void;
 } {

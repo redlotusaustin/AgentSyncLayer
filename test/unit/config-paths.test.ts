@@ -1,8 +1,8 @@
-import { describe, test, expect, afterEach } from 'bun:test';
-import { resolveBusConfig, resetBusConfig } from '../../src/config';
+import { afterEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { resetBusConfig, resolveBusConfig } from '../../src/config';
 import { createTestBusEnv } from '../helpers';
-import * as fs from 'fs';
-import * as path from 'path';
 
 describe('config-paths (T4)', () => {
   afterEach(() => {
@@ -15,10 +15,7 @@ describe('config-paths (T4)', () => {
       const absPath = path.join(root, 'my-bus-dir');
       fs.mkdirSync(absPath, { recursive: true });
 
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: absPath })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: absPath }));
 
       const config = resolveBusConfig(root);
       expect(config.bus_dir).toBe(absPath);
@@ -30,10 +27,7 @@ describe('config-paths (T4)', () => {
   test('T4.2: bus with relative path "."', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       const config = resolveBusConfig(root);
       expect(config.bus_dir).toBe(root);
@@ -52,10 +46,7 @@ describe('config-paths (T4)', () => {
       fs.mkdirSync(subDir, { recursive: true });
 
       // Create .agentsynclayer.json in subDir pointing to parent with ".."
-      fs.writeFileSync(
-        path.join(subDir, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '..' })
-      );
+      fs.writeFileSync(path.join(subDir, '.agentsynclayer.json'), JSON.stringify({ bus: '..' }));
 
       const config = resolveBusConfig(subDir);
       expect(config.bus_dir).toBe(parentDir);
@@ -70,10 +61,7 @@ describe('config-paths (T4)', () => {
       const busDir = path.join(root, 'bus');
       fs.mkdirSync(busDir, { recursive: true });
 
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: busDir })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: busDir }));
 
       const config = resolveBusConfig(root);
       expect(config.db_dir).toBe(busDir);
@@ -92,7 +80,7 @@ describe('config-paths (T4)', () => {
 
       fs.writeFileSync(
         path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: busDir, db: dbDir })
+        JSON.stringify({ bus: busDir, db: dbDir }),
       );
 
       const config = resolveBusConfig(root);
@@ -113,7 +101,7 @@ describe('config-paths (T4)', () => {
 
       fs.writeFileSync(
         path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: './bus', db: './db' })
+        JSON.stringify({ bus: './bus', db: './db' }),
       );
 
       const config = resolveBusConfig(root);
@@ -135,10 +123,7 @@ describe('config-paths (T4)', () => {
       const symlinkDir = path.join(root, 'symlink-project');
       fs.symlinkSync(realDir, symlinkDir, 'junction');
 
-      fs.writeFileSync(
-        path.join(realDir, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(realDir, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       // Resolve from symlink path
       const config = resolveBusConfig(symlinkDir);
@@ -162,7 +147,7 @@ describe('config-paths (T4)', () => {
 
       fs.writeFileSync(
         path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: './bus-symlink' })
+        JSON.stringify({ bus: './bus-symlink' }),
       );
 
       const config = resolveBusConfig(root);

@@ -1,8 +1,8 @@
-import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import { Database } from 'bun:sqlite';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { createTestSqliteContext, initializeTestSqliteSchema } from '../helpers';
 
 describe('Schema: FTS5 Table Alignment', () => {
@@ -26,25 +26,25 @@ describe('Schema: FTS5 Table Alignment', () => {
     });
 
     test('messages_fts has 6 columns', () => {
-      const columns = ctx.db
-        .prepare("PRAGMA table_info('messages_fts')")
-        .all() as Array<{ name: string }>;
+      const columns = ctx.db.prepare("PRAGMA table_info('messages_fts')").all() as Array<{
+        name: string;
+      }>;
       expect(columns.length).toBe(6);
     });
 
     test('messages_fts has text column', () => {
-      const columns = ctx.db
-        .prepare("PRAGMA table_info('messages_fts')")
-        .all() as Array<{ name: string }>;
-      const columnNames = columns.map(c => c.name);
+      const columns = ctx.db.prepare("PRAGMA table_info('messages_fts')").all() as Array<{
+        name: string;
+      }>;
+      const columnNames = columns.map((c) => c.name);
       expect(columnNames).toContain('text');
     });
 
     test('messages_fts has payload column', () => {
-      const columns = ctx.db
-        .prepare("PRAGMA table_info('messages_fts')")
-        .all() as Array<{ name: string }>;
-      const columnNames = columns.map(c => c.name);
+      const columns = ctx.db.prepare("PRAGMA table_info('messages_fts')").all() as Array<{
+        name: string;
+      }>;
+      const columnNames = columns.map((c) => c.name);
       expect(columnNames).toContain('payload');
     });
 
@@ -52,10 +52,10 @@ describe('Schema: FTS5 Table Alignment', () => {
       // FTS5 virtual tables always have 2 internal hidden columns (rowid mapping).
       // The important check is that visible columns are correct, not hidden column count.
       // PRAGMA table_info shows only visible columns (hidden=0), verifying the schema.
-      const columns = ctx.db
-        .prepare("PRAGMA table_info('messages_fts')")
-        .all() as Array<{ name: string }>;
-      const visibleColumnNames = columns.map(c => c.name);
+      const columns = ctx.db.prepare("PRAGMA table_info('messages_fts')").all() as Array<{
+        name: string;
+      }>;
+      const visibleColumnNames = columns.map((c) => c.name);
       // Verify standalone FTS5: must have id, channel, from, type, text, payload as visible columns
       expect(visibleColumnNames).toEqual(['id', 'channel', 'from', 'type', 'text', 'payload']);
     });
@@ -107,17 +107,17 @@ describe('Schema: initializeTestSqliteSchema() alignment', () => {
       // Call the schema initializer
       initializeTestSqliteSchema(db);
 
-      const columns = db
-        .prepare("PRAGMA table_info('messages_fts')")
-        .all() as Array<{ name: string }>;
+      const columns = db.prepare("PRAGMA table_info('messages_fts')").all() as Array<{
+        name: string;
+      }>;
       expect(columns.length).toBe(6);
     });
 
     test('messages_fts has standalone text column (not content sync)', () => {
-      const columns = db
-        .prepare("PRAGMA table_info('messages_fts')")
-        .all() as Array<{ name: string }>;
-      const columnNames = columns.map(c => c.name);
+      const columns = db.prepare("PRAGMA table_info('messages_fts')").all() as Array<{
+        name: string;
+      }>;
+      const columnNames = columns.map((c) => c.name);
       expect(columnNames).toContain('text');
     });
 
@@ -168,14 +168,15 @@ describe('Schema: FTS5 Search Snippet Extraction (T4)', () => {
       testMessage.payload,
       testMessage.timestamp,
       testMessage.project,
-      testMessage.created_at
+      testMessage.created_at,
     );
 
     // Search for the message using the text column content
     const searchQuery = 'search target';
     const sanitizedQuery = `"${searchQuery}"*`;
 
-    const results = db.prepare(`
+    const results = db
+      .prepare(`
       SELECT m.*, fts.rank,
         snippet(messages_fts, 4, '>>', '<<', '...', 32) as snippet
       FROM messages_fts fts
@@ -183,7 +184,8 @@ describe('Schema: FTS5 Search Snippet Extraction (T4)', () => {
       WHERE messages_fts MATCH ? AND m.project = ?
       ORDER BY fts.rank
       LIMIT 10
-    `).all(sanitizedQuery, 'testproject') as Array<{ snippet: string; payload: string }>;
+    `)
+      .all(sanitizedQuery, 'testproject') as Array<{ snippet: string; payload: string }>;
 
     expect(results.length).toBeGreaterThan(0);
     const result = results[0];

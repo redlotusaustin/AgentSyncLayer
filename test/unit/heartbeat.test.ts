@@ -5,7 +5,7 @@
  * to keep agent status alive in Redis.
  */
 
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { HeartbeatManager, type HeartbeatState } from '../../src/heartbeat';
 
 // Test state factory

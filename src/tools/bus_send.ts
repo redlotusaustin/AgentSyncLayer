@@ -1,5 +1,5 @@
 /**
- * bus_send tool - Publish a message to an AgentBus channel
+ * bus_send tool - Publish a message to a bus channel
  *
  * Operations:
  * 1. PUBLISH message to pub/sub channel

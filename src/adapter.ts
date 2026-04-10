@@ -1,7 +1,7 @@
 /**
- * AgentBus OpenCode Plugin Adapter
+ * AgentSyncLayer OpenCode Plugin Adapter
  *
- * This module bridges the existing AgentBus tool implementations to OpenCode's
+ * This module bridges the AgentSyncLayer tool implementations to OpenCode's
  * plugin API. It wraps each tool with proper Zod schemas and converts responses
  * to the string format OpenCode expects.
  *
@@ -47,15 +47,15 @@ import {
 } from './tools';
 import { buildNotificationText, getLastSeenTimestamp } from './tools/notifications';
 // Import types for ToolContext conversion
-import type { ToolContext as AgentBusToolContext } from './types';
+import type { ToolContext as AslToolContext } from './types';
 
 // ============================================================================
 // Bus Usage Instructions (injected into system prompt on every turn)
 // ============================================================================
 
 const BUS_INSTRUCTIONS: string[] = [
-  '## AgentBus — Inter-Agent Communication',
-  'You have access to AgentBus tools for coordinating with other agents in this project.',
+  '## AgentSyncLayer — Inter-Agent Communication',
+  'You have access to AgentSyncLayer tools for coordinating with other agents in this project.',
   '',
   '**When to use the bus:**',
   '- Before starting a task: use bus_status to announce what you are working on',
@@ -69,10 +69,10 @@ const BUS_INSTRUCTIONS: string[] = [
 ];
 
 // ============================================================================
-// Helper: Convert OpenCode ToolContext to AgentBus ToolContext
+// Helper: Convert OpenCode ToolContext to ASL ToolContext
 // ============================================================================
 
-function toAgentBusContext(context: ToolContext): AgentBusToolContext {
+function toAslContext(context: ToolContext): AslToolContext {
   // Guard against missing or malformed context
   if (!context || typeof context.directory !== 'string' || !context.directory) {
     return {
@@ -99,11 +99,11 @@ function responseToString(response: unknown): string {
 // ============================================================================
 
 /**
- * bus_send — Publish a message to an AgentBus channel
+ * bus_send — Publish a message to a bus channel
  */
 const bus_send = tool({
   description:
-    'Publish a message to an AgentBus channel. Use this to communicate with other agents in the project.',
+    'Publish a message to a bus channel. Use this to communicate with other agents in the project.',
   args: {
     channel: z
       .string()
@@ -117,7 +117,7 @@ const bus_send = tool({
       .describe('Message type (default: info)'),
   },
   async execute(args, context) {
-    const result = await busSendExecute(args, toAgentBusContext(context));
+    const result = await busSendExecute(args, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -126,8 +126,7 @@ const bus_send = tool({
  * bus_read — Read recent messages from a channel
  */
 const bus_read = tool({
-  description:
-    'Read recent messages from an AgentBus channel. Returns messages sorted newest first.',
+  description: 'Read recent messages from a bus channel. Returns messages sorted newest first.',
   args: {
     channel: z.string().min(1).max(64).describe('The channel name to read from'),
     limit: z
@@ -139,7 +138,7 @@ const bus_read = tool({
       .describe('Maximum number of messages to return (default: 20)'),
   },
   async execute(args, context) {
-    const result = await busReadExecute(args, toAgentBusContext(context));
+    const result = await busReadExecute(args, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -152,7 +151,7 @@ const bus_channels = tool({
     'List all active channels in the current project. Shows channel names and message counts.',
   args: {},
   async execute(_args, context) {
-    const result = await busChannelsExecute({}, toAgentBusContext(context));
+    const result = await busChannelsExecute({}, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -172,7 +171,7 @@ const bus_status = tool({
       .describe("Channels this agent is subscribed to (default: ['general'])"),
   },
   async execute(args, context) {
-    const result = await busStatusExecute(args, toAgentBusContext(context));
+    const result = await busStatusExecute(args, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -185,20 +184,20 @@ const bus_agents = tool({
     'List all active agents in the current project with their status and subscribed channels.',
   args: {},
   async execute(_args, context) {
-    const result = await busAgentsExecute({}, toAgentBusContext(context));
+    const result = await busAgentsExecute({}, toAslContext(context));
     return responseToString(result);
   },
 });
 
 /**
- * bus_info — Get AgentBus configuration info
+ * bus_info — Get bus configuration info
  */
 const bus_info = tool({
   description:
-    'Get AgentBus configuration info for the current project. Returns project hash, bus directory, db directory, and config source.',
+    'Get bus configuration info for the current project. Returns project hash, bus directory, db directory, and config source.',
   args: {},
   async execute(_args, context) {
-    const result = await busInfoExecute({}, toAgentBusContext(context));
+    const result = await busInfoExecute({}, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -217,7 +216,7 @@ const bus_claim = tool({
       .describe("The file path to claim (relative, e.g. 'src/auth/login.ts')"),
   },
   async execute(args, context) {
-    const result = await busClaimExecute(args, toAgentBusContext(context));
+    const result = await busClaimExecute(args, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -234,7 +233,7 @@ const bus_release = tool({
       .describe("The file path to release (relative, e.g. 'src/auth/login.ts')"),
   },
   async execute(args, context) {
-    const result = await busReleaseExecute(args, toAgentBusContext(context));
+    const result = await busReleaseExecute(args, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -259,7 +258,7 @@ const bus_listen = tool({
       .describe('Timeout in seconds (default: 10, max: 30)'),
   },
   async execute(args, context) {
-    const result = await busListenExecute(args, toAgentBusContext(context));
+    const result = await busListenExecute(args, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -287,7 +286,7 @@ const bus_history = tool({
       .describe('Messages per page (default: 50)'),
   },
   async execute(args, context) {
-    const result = await busHistoryExecute(args, toAgentBusContext(context));
+    const result = await busHistoryExecute(args, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -309,7 +308,7 @@ const bus_search = tool({
     limit: z.number().int().min(1).max(100).optional().describe('Maximum results (default: 20)'),
   },
   async execute(args, context) {
-    const result = await busSearchExecute(args, toAgentBusContext(context));
+    const result = await busSearchExecute(args, toAslContext(context));
     return responseToString(result);
   },
 });
@@ -352,7 +351,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
     await redis.waitForConnection(5000);
     state.connected = true;
   } catch {
-    console.warn('[AgentBus] Redis connection timeout, continuing anyway');
+    console.warn('[AgentSyncLayer] Redis connection timeout, continuing anyway');
     state.connected = false;
   }
 
@@ -361,7 +360,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
   const heartbeatManager = new HeartbeatManager({
     agentId,
     projectHash,
-    task: 'AgentBus active',
+    task: 'AgentSyncLayer active',
     files: [],
     claimedFiles: [],
     channels: ['general'],
@@ -372,7 +371,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
     await heartbeatManager.start();
     state.heartbeatManager = heartbeatManager;
   } catch (error) {
-    console.warn('[AgentBus] Failed to start heartbeat:', error);
+    console.warn('[AgentSyncLayer] Failed to start heartbeat:', error);
   }
 
   state.projectHash = projectHash;
@@ -382,7 +381,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
   // Initialize SQLite client (optional, graceful degradation)
   const sqlite = getSqliteClient(dbDir, projectHash);
   if (!sqlite) {
-    console.warn('[AgentBus] SQLite not available, running in Redis-only mode');
+    console.warn('[AgentSyncLayer] SQLite not available, running in Redis-only mode');
   }
 
   return {

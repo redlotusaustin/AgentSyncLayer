@@ -1,9 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  generateAgentId,
-  composeAgentId,
-  parseAgentId,
-} from '../../src/agent';
+import { composeAgentId, generateAgentId, parseAgentId } from '../../src/agent';
 import { isValidAgentId } from '../../src/validation';
 
 describe('generateAgentId', () => {

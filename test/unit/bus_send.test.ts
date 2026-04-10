@@ -10,24 +10,15 @@
  * - T3.6: inserts FTS5 entry alongside message
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import {
-  getSqliteClient,
-  closeSqliteClient,
-} from '../../src/sqlite';
-import {
-  RedisClient,
-  getRedisClient,
-  setRedisClient,
-  resetRedisClient,
-} from '../../src/redis';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { hashProjectPath } from '../../src/namespace';
+import { RedisClient, resetRedisClient, setRedisClient } from '../../src/redis';
 import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
-import { busSendExecute } from '../../src/tools/bus_send';
-import { cleanupRateLimiter } from '../../src/tools/bus_send';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
+import { busSendExecute, cleanupRateLimiter } from '../../src/tools/bus_send';
 import type { ToolContext } from '../../src/types';
 
 // Test configuration
@@ -97,7 +88,7 @@ describe('bus_send unit tests', () => {
     test('sends message to both SQLite and Redis', async () => {
       const result = await busSendExecute(
         { channel: 'general', message: 'Test message' },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
@@ -109,7 +100,7 @@ describe('bus_send unit tests', () => {
       const historyKey = `opencode:${projectHash}:history:general`;
       const redisMessages = await redis.zrange(historyKey, 0, -1);
 
-      const foundInRedis = redisMessages.some(msg => {
+      const foundInRedis = redisMessages.some((msg) => {
         try {
           const parsed = JSON.parse(msg);
           return parsed.id === messageId;
@@ -130,14 +121,14 @@ describe('bus_send unit tests', () => {
         offset: 0,
       });
 
-      const foundInSqlite = messages.some(msg => msg.id === messageId);
+      const foundInSqlite = messages.some((msg) => msg.id === messageId);
       expect(foundInSqlite).toBe(true);
     });
 
     test('stores correct message fields in SQLite', async () => {
       const result = await busSendExecute(
         { channel: 'test-channel', message: 'Hello world', type: 'info' },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
@@ -170,14 +161,14 @@ describe('bus_send unit tests', () => {
 
       // Mock sqlite.insertMessage to throw
       const originalInsert = sqlite!.insertMessage.bind(sqlite!);
-      sqlite!.insertMessage = function(msg: any) {
+      sqlite!.insertMessage = (_msg: any) => {
         throw new Error('Simulated SQLite error');
       };
 
       try {
         const result = await busSendExecute(
           { channel: 'general', message: 'Test message' },
-          testContext
+          testContext,
         );
 
         // Should still succeed (SQLite failure is non-fatal)
@@ -194,7 +185,7 @@ describe('bus_send unit tests', () => {
     test('message should be in SQLite even if Redis fails', async () => {
       const result = await busSendExecute(
         { channel: 'general', message: 'Test message' },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
@@ -209,7 +200,7 @@ describe('bus_send unit tests', () => {
         offset: 0,
       });
 
-      const foundInSqlite = messages.some(msg => msg.id === messageId);
+      const foundInSqlite = messages.some((msg) => msg.id === messageId);
       expect(foundInSqlite).toBe(true);
     });
   });
@@ -220,11 +211,11 @@ describe('bus_send unit tests', () => {
       redisWrapper.forceClose();
 
       // Wait a bit for the connection to close
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const result = await busSendExecute(
         { channel: 'general', message: 'Test message' },
-        testContext
+        testContext,
       );
 
       // With R-1 fix: If SQLite succeeds but Redis is down, return ok:true
@@ -250,7 +241,7 @@ describe('bus_send unit tests', () => {
 
       // Mock sqlite.insertMessage to throw
       const originalInsert = sqlite!.insertMessage.bind(sqlite!);
-      sqlite!.insertMessage = function(msg: any) {
+      sqlite!.insertMessage = (_msg: any) => {
         throw new Error('Simulated SQLite error');
       };
 
@@ -258,12 +249,12 @@ describe('bus_send unit tests', () => {
       redisWrapper.forceClose();
 
       // Wait a bit for the connection to close
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       try {
         const result = await busSendExecute(
           { channel: 'general', message: 'Test message' },
-          testContext
+          testContext,
         );
 
         // Both SQLite and Redis failed - bus is unavailable
@@ -292,19 +283,14 @@ describe('bus_send unit tests', () => {
 
       const result = await busSendExecute(
         { channel: 'general', message: `Hello ${searchText} world` },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(true);
 
       // Verify message is searchable
       const sqlite = getSqliteClient(testDir.dir, projectHash);
-      const searchResults = sqlite!.searchMessages(
-        projectHash,
-        searchText,
-        'general',
-        10
-      );
+      const searchResults = sqlite!.searchMessages(projectHash, searchText, 'general', 10);
 
       expect(searchResults).toHaveLength(1);
       expect(searchResults[0].message.payload.text).toContain(searchText);
@@ -313,10 +299,7 @@ describe('bus_send unit tests', () => {
 
   describe('existing validation behavior', () => {
     test('returns CHANNEL_INVALID for empty channel', async () => {
-      const result = await busSendExecute(
-        { channel: '', message: 'Test' },
-        testContext
-      );
+      const result = await busSendExecute({ channel: '', message: 'Test' }, testContext);
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('CHANNEL_INVALID');
@@ -329,16 +312,13 @@ describe('bus_send unit tests', () => {
 
       // Send 101 messages to trigger rate limit (default: 100/minute)
       for (let i = 0; i < 101; i++) {
-        await busSendExecute(
-          { channel: 'general', message: `Rate test ${i}` },
-          testContext
-        );
+        await busSendExecute({ channel: 'general', message: `Rate test ${i}` }, testContext);
       }
 
       // Next message should be rate limited
       const result = await busSendExecute(
         { channel: 'general', message: 'This should be limited' },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(false);

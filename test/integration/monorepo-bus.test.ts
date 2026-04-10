@@ -7,30 +7,26 @@
  * Tests: I1.1-I1.4
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { resolveBusConfig } from '../../src/config';
+import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
 import {
-  createTestContext,
-  createTestRedisClient,
-  isRedisAvailable,
-  waitFor,
-  generateTestAgentId,
-  createTestBusEnv,
-  createTestDirTree,
-} from '../helpers';
-import {
-  busSendExecute,
-  busReadExecute,
-  busStatusExecute,
   busAgentsExecute,
   busClaimExecute,
   busHistoryExecute,
+  busReadExecute,
+  busSendExecute,
+  busStatusExecute,
   cleanupRateLimiter,
 } from '../../src/tools';
-import { resolveBusConfig } from '../../src/config';
-import { setSessionAgentId, resetSessionAgentId } from '../../src/session';
+import {
+  createTestContext,
+  createTestDirTree,
+  generateTestAgentId,
+  isRedisAvailable,
+} from '../helpers';
 
 describe('I1: Monorepo Cross-Directory Communication', () => {
   const ctx = createTestContext();
@@ -60,10 +56,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
     test('agent in sub1 can send message that agent in sub2 can read', async () => {
       // Create monorepo structure with shared config
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -79,7 +72,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent1Id);
         const sendResult = await busSendExecute(
           { channel: 'general', message: 'Hello from API package!' },
-          { directory: sub1 }
+          { directory: sub1 },
         );
 
         expect(sendResult.ok).toBe(true);
@@ -89,7 +82,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent2Id);
         const readResult = await busReadExecute(
           { channel: 'general', limit: 10 },
-          { directory: sub2 }
+          { directory: sub2 },
         );
 
         expect(readResult.ok).toBe(true);
@@ -97,9 +90,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         expect(readResult.data!.messages.length).toBeGreaterThan(0);
 
         // Verify the message content
-        const messageFromAgent1 = readResult.data!.messages.find(
-          (m) => m.from === agent1Id
-        );
+        const messageFromAgent1 = readResult.data!.messages.find((m) => m.from === agent1Id);
         expect(messageFromAgent1).toBeDefined();
         expect(messageFromAgent1!.payload).toEqual({ text: 'Hello from API package!' });
       } finally {
@@ -109,10 +100,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
 
     test('agent in sub2 can send reply that agent in sub1 can read', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -122,7 +110,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent2Id);
         const replyResult = await busSendExecute(
           { channel: 'general', message: 'Reply from Web package!' },
-          { directory: sub2 }
+          { directory: sub2 },
         );
 
         expect(replyResult.ok).toBe(true);
@@ -131,14 +119,14 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent1Id);
         const readResult = await busReadExecute(
           { channel: 'general', limit: 10 },
-          { directory: sub1 }
+          { directory: sub1 },
         );
 
         expect(readResult.ok).toBe(true);
 
         // Should see message from agent 2
         const hasWebReply = readResult.data!.messages.some(
-          (m) => m.from === agent2Id && (m.payload as any).text === 'Reply from Web package!'
+          (m) => m.from === agent2Id && (m.payload as any).text === 'Reply from Web package!',
         );
         expect(hasWebReply).toBe(true);
       } finally {
@@ -150,10 +138,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
   describe('I1.2: Agent visibility across directories', () => {
     test('both agents see each other in bus_agents', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -163,14 +148,14 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent1Id);
         await busStatusExecute(
           { task: 'Working on API', files: ['api.ts'], channels: ['general'] },
-          { directory: sub1 }
+          { directory: sub1 },
         );
 
         // Register agent 2's status
         setSessionAgentId(agent2Id);
         await busStatusExecute(
           { task: 'Working on Web', files: ['web.ts'], channels: ['general'] },
-          { directory: sub2 }
+          { directory: sub2 },
         );
 
         // Give Redis time to propagate
@@ -194,10 +179,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
   describe('I1.3: File claims visible across directories', () => {
     test('claim from sub1 visible to sub2', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -207,7 +189,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent1Id);
         const claimResult = await busClaimExecute(
           { path: 'packages/api/src/main.ts' },
-          { directory: sub1 }
+          { directory: sub1 },
         );
 
         expect(claimResult.ok).toBe(true);
@@ -217,7 +199,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent2Id);
         const conflictResult = await busClaimExecute(
           { path: 'packages/api/src/main.ts' },
-          { directory: sub2 }
+          { directory: sub2 },
         );
 
         // Should get conflict (agent 1 already has it)
@@ -230,10 +212,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
 
     test('different files can be claimed independently', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -243,7 +222,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent1Id);
         const claim1 = await busClaimExecute(
           { path: 'packages/api/src/file1.ts' },
-          { directory: sub1 }
+          { directory: sub1 },
         );
         expect(claim1.ok).toBe(true);
 
@@ -251,7 +230,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent2Id);
         const claim2 = await busClaimExecute(
           { path: 'packages/web/src/file2.ts' },
-          { directory: sub2 }
+          { directory: sub2 },
         );
         expect(claim2.ok).toBe(true);
 
@@ -267,10 +246,7 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
   describe('I1.4: History visible across directories', () => {
     test('bus_history returns messages from both agents', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -280,30 +256,28 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
         setSessionAgentId(agent1Id);
         await busSendExecute(
           { channel: 'coordination', message: 'Coordination message from agent 1' },
-          { directory: sub1 }
+          { directory: sub1 },
         );
 
         // Send messages from agent 2
         setSessionAgentId(agent2Id);
         await busSendExecute(
           { channel: 'coordination', message: 'Coordination message from agent 2' },
-          { directory: sub2 }
+          { directory: sub2 },
         );
 
         // Read history from agent 1's context
         setSessionAgentId(agent1Id);
         const historyResult = await busHistoryExecute(
           { channel: 'coordination', page: 1, per_page: 10 },
-          { directory: sub1 }
+          { directory: sub1 },
         );
 
         expect(historyResult.ok).toBe(true);
         expect(historyResult.data!.messages.length).toBeGreaterThanOrEqual(2);
 
         // Verify both agents' messages are present
-        const messageTexts = historyResult.data!.messages.map(
-          (m) => (m.payload as any).text
-        );
+        const messageTexts = historyResult.data!.messages.map((m) => (m.payload as any).text);
         expect(messageTexts).toContain('Coordination message from agent 1');
         expect(messageTexts).toContain('Coordination message from agent 2');
       } finally {

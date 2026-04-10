@@ -11,25 +11,16 @@
  * - T4.7: preserves existing validation behavior
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import {
-  getSqliteClient,
-  closeSqliteClient,
-} from '../../src/sqlite';
-import {
-  RedisClient,
-  getRedisClient,
-  setRedisClient,
-  resetRedisClient,
-} from '../../src/redis';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { hashProjectPath } from '../../src/namespace';
+import { RedisClient, resetRedisClient, setRedisClient } from '../../src/redis';
 import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
 import { busReadExecute } from '../../src/tools/bus_read';
-import { busSendExecute } from '../../src/tools/bus_send';
-import { cleanupRateLimiter } from '../../src/tools/bus_send';
+import { busSendExecute, cleanupRateLimiter } from '../../src/tools/bus_send';
 import type { Message, ToolContext } from '../../src/types';
 
 // Test configuration
@@ -113,15 +104,12 @@ describe('bus_read unit tests', () => {
       // First send a message via bus_send (writes to both)
       const sendResult = await busSendExecute(
         { channel: 'general', message: 'Hello Redis' },
-        testContext
+        testContext,
       );
       expect(sendResult.ok).toBe(true);
 
       // Read should return from Redis
-      const result = await busReadExecute(
-        { channel: 'general', limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data).toBeDefined();
@@ -131,10 +119,7 @@ describe('bus_read unit tests', () => {
 
     test('uses Redis when both Redis and SQLite have messages', async () => {
       // Send a message
-      await busSendExecute(
-        { channel: 'general', message: 'Test message' },
-        testContext
-      );
+      await busSendExecute({ channel: 'general', message: 'Test message' }, testContext);
 
       // Verify SQLite also has the message
       const sqlite = getSqliteClient(testDir.dir, projectHash);
@@ -147,10 +132,7 @@ describe('bus_read unit tests', () => {
       expect(sqliteMessages.messages.length).toBe(1);
 
       // Read should return from Redis (fast path)
-      const result = await busReadExecute(
-        { channel: 'general', limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.messages.length).toBe(1);
@@ -172,10 +154,7 @@ describe('bus_read unit tests', () => {
       await redis.flushdb();
 
       // Read should fall back to SQLite
-      const result = await busReadExecute(
-        { channel: 'general', limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.messages.length).toBe(1);
@@ -186,10 +165,12 @@ describe('bus_read unit tests', () => {
       // Insert multiple messages into SQLite
       const sqlite = getSqliteClient(testDir.dir, projectHash);
       for (let i = 0; i < 5; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          payload: { text: `Message ${i}` },
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            payload: { text: `Message ${i}` },
+          }),
+        );
       }
 
       // Clear Redis
@@ -197,10 +178,7 @@ describe('bus_read unit tests', () => {
       await redis.flushdb();
 
       // Read should return all 5 messages
-      const result = await busReadExecute(
-        { channel: 'general', limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(5);
@@ -222,14 +200,11 @@ describe('bus_read unit tests', () => {
       redisWrapper.forceClose();
 
       // Wait a bit for the connection to close
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       try {
         // Read should still work via SQLite fallback
-        const result = await busReadExecute(
-          { channel: 'general', limit: 10 },
-          testContext
-        );
+        const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
         expect(result.ok).toBe(true);
         expect(result.data!.messages.length).toBe(1);
@@ -252,14 +227,11 @@ describe('bus_read unit tests', () => {
       redisWrapper.forceClose();
 
       // Wait a bit for the connection to close
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       try {
         // Use the same testDir context so hashProjectPath works
-        const result = await busReadExecute(
-          { channel: 'general', limit: 10 },
-          testContext
-        );
+        const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
         // Should return empty, not error
         expect(result.ok).toBe(true);
@@ -288,10 +260,7 @@ describe('bus_read unit tests', () => {
 
       // No SQLite data
 
-      const result = await busReadExecute(
-        { channel: 'general', limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.messages).toEqual([]);
@@ -307,14 +276,13 @@ describe('bus_read unit tests', () => {
 
       // Insert message and read it
       const sqlite = getSqliteClient(testDir.dir, projectHash);
-      sqlite!.insertMessage(createTestMessage(projectHash, {
-        channel: 'general',
-      }));
-
-      await busReadExecute(
-        { channel: 'general', limit: 10 },
-        testContext
+      sqlite!.insertMessage(
+        createTestMessage(projectHash, {
+          channel: 'general',
+        }),
       );
+
+      await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
       // Check Redis for last-seen key
       const redis = redisWrapper.getClient();
@@ -336,10 +304,7 @@ describe('bus_read unit tests', () => {
       await redis.flushdb();
 
       // Read from empty channel
-      await busReadExecute(
-        { channel: 'empty-channel', limit: 10 },
-        testContext
-      );
+      await busReadExecute({ channel: 'empty-channel', limit: 10 }, testContext);
 
       // Check last-seen was still updated
       const lastSeenKey = `opencode:${projectHash}:lastseen:${agentId}`;
@@ -352,10 +317,7 @@ describe('bus_read unit tests', () => {
   describe('T4.6: handles malformed Redis messages gracefully', () => {
     test('skips malformed JSON messages', async () => {
       // Insert a valid message via bus_send
-      await busSendExecute(
-        { channel: 'general', message: 'Valid message' },
-        testContext
-      );
+      await busSendExecute({ channel: 'general', message: 'Valid message' }, testContext);
 
       // Manually insert a malformed message into Redis
       const redis = redisWrapper.getClient();
@@ -363,10 +325,7 @@ describe('bus_read unit tests', () => {
       await redis.zadd(historyKey, Date.now(), 'not-valid-json{');
 
       // Read should skip the malformed message
-      const result = await busReadExecute(
-        { channel: 'general', limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       // Should have at least the valid message
@@ -385,10 +344,7 @@ describe('bus_read unit tests', () => {
       await redis.zadd(historyKey, Date.now(), '');
 
       // Read should handle empty string gracefully
-      const result = await busReadExecute(
-        { channel: 'general', limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general', limit: 10 }, testContext);
 
       expect(result.ok).toBe(true);
       // Should not throw or crash
@@ -397,10 +353,7 @@ describe('bus_read unit tests', () => {
 
   describe('T4.7: preserves existing validation behavior', () => {
     test('returns CHANNEL_INVALID for empty channel', async () => {
-      const result = await busReadExecute(
-        { channel: '', limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: '', limit: 10 }, testContext);
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('CHANNEL_INVALID');
@@ -409,7 +362,7 @@ describe('bus_read unit tests', () => {
     test('returns CHANNEL_INVALID for invalid channel characters', async () => {
       const result = await busReadExecute(
         { channel: 'invalid channel with space', limit: 10 },
-        testContext
+        testContext,
       );
 
       expect(result.ok).toBe(false);
@@ -418,10 +371,7 @@ describe('bus_read unit tests', () => {
 
     test('returns CHANNEL_INVALID for channel exceeding max length', async () => {
       const longChannel = 'a'.repeat(65); // Max is 64
-      const result = await busReadExecute(
-        { channel: longChannel, limit: 10 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: longChannel, limit: 10 }, testContext);
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('CHANNEL_INVALID');
@@ -431,10 +381,12 @@ describe('bus_read unit tests', () => {
       // Insert 5 messages into SQLite
       const sqlite = getSqliteClient(testDir.dir, projectHash);
       for (let i = 0; i < 5; i++) {
-        sqlite!.insertMessage(createTestMessage(projectHash, {
-          channel: 'general',
-          payload: { text: `Message ${i}` },
-        }));
+        sqlite!.insertMessage(
+          createTestMessage(projectHash, {
+            channel: 'general',
+            payload: { text: `Message ${i}` },
+          }),
+        );
       }
 
       // Clear Redis
@@ -442,10 +394,7 @@ describe('bus_read unit tests', () => {
       await redis.flushdb();
 
       // Request only 2 messages
-      const result = await busReadExecute(
-        { channel: 'general', limit: 2 },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general', limit: 2 }, testContext);
 
       expect(result.ok).toBe(true);
       expect(result.data!.count).toBe(2);
@@ -453,10 +402,7 @@ describe('bus_read unit tests', () => {
     });
 
     test('defaults limit to 20', async () => {
-      const result = await busReadExecute(
-        { channel: 'general' },
-        testContext
-      );
+      const result = await busReadExecute({ channel: 'general' }, testContext);
 
       expect(result.ok).toBe(true);
       // Should use default limit of 20

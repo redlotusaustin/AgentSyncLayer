@@ -8,24 +8,24 @@
  * Tests will skip gracefully if Redis is not running.
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
+import { closeSqliteClient, getSqliteClient } from '../../src/sqlite';
+import { busHistoryExecute } from '../../src/tools/bus_history';
+import { busReadExecute } from '../../src/tools/bus_read';
+import { busSendExecute } from '../../src/tools/bus_send';
+import { getLastSeenTimestamp, updateLastSeenTimestamp } from '../../src/tools/notifications';
+import type { Message } from '../../src/types';
+import { createTestMessage, createTestMessages } from '../fixtures';
 import {
   createTestContext,
-  getTestProjectHash,
   generateTestAgentId,
+  getTestProjectHash,
   isRedisAvailable,
 } from '../helpers';
-import { createTestMessages, createTestMessage } from '../fixtures';
-import { getSqliteClient, closeSqliteClient } from '../../src/sqlite';
-import { getLastSeenTimestamp, updateLastSeenTimestamp } from '../../src/tools/notifications';
-import { busSendExecute } from '../../src/tools/bus_send';
-import { busReadExecute } from '../../src/tools/bus_read';
-import { busHistoryExecute } from '../../src/tools/bus_history';
-import { setSessionAgentId, resetSessionAgentId } from '../../src/session';
-import type { Message } from '../../src/types';
 
 describe('T10: Notification Tracking', () => {
   const ctx = createTestContext();
@@ -189,7 +189,7 @@ describe('T10: Notification Tracking', () => {
 
       // Should only return the new message for this channel
       const ourNewMessages = secondTurn.filter(
-        (m) => m.channel === channel && m.id === newMessage.id
+        (m) => m.channel === channel && m.id === newMessage.id,
       );
       expect(ourNewMessages.length).toBe(1);
       expect(secondTurn[0].id).toBe(newMessage.id);
@@ -206,20 +206,17 @@ describe('T10: Notification Tracking', () => {
       // Send initial message
       const sendResult = await busSendExecute(
         { channel, message: 'Initial message' },
-        { directory: testDir }
+        { directory: testDir },
       );
       expect(sendResult.ok).toBe(true);
-      const initialMessageId = sendResult.data!.id;
+      const _initialMessageId = sendResult.data!.id;
 
       // Clear last-seen to simulate fresh agent
       const lastSeenKey = `opencode:${projectHash}:lastseen:${agentId}`;
       await ctx.redis.del(lastSeenKey);
 
       // Read messages (should update last-seen)
-      const readResult = await busReadExecute(
-        { channel, limit: 10 },
-        { directory: testDir }
-      );
+      const readResult = await busReadExecute({ channel, limit: 10 }, { directory: testDir });
       expect(readResult.ok).toBe(true);
 
       // Check last-seen was updated
@@ -260,10 +257,10 @@ describe('T10: Notification Tracking', () => {
       // Send initial message
       const sendResult = await busSendExecute(
         { channel, message: 'History initial message' },
-        { directory: testDir }
+        { directory: testDir },
       );
       expect(sendResult.ok).toBe(true);
-      const initialMessageId = sendResult.data!.id;
+      const _initialMessageId = sendResult.data!.id;
 
       // Clear last-seen
       const lastSeenKey = `opencode:${projectHash}:lastseen:${agentId}`;
@@ -272,7 +269,7 @@ describe('T10: Notification Tracking', () => {
       // Read history (should update last-seen)
       const historyResult = await busHistoryExecute(
         { channel, page: 1, per_page: 50 },
-        { directory: testDir }
+        { directory: testDir },
       );
       expect(historyResult.ok).toBe(true);
 

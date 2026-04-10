@@ -1,8 +1,8 @@
-import { describe, test, expect, afterEach } from 'bun:test';
-import { resolveBusConfig, resetBusConfig } from '../../src/config';
+import { afterEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { resetBusConfig, resolveBusConfig } from '../../src/config';
 import { createTestBusEnv } from '../helpers';
-import * as fs from 'fs';
-import * as path from 'path';
 
 describe('config-cache (T6)', () => {
   afterEach(() => {
@@ -50,7 +50,7 @@ describe('config-cache (T6)', () => {
       fs.mkdirSync(busDir, { recursive: true });
       fs.writeFileSync(
         path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: './new-bus' })
+        JSON.stringify({ bus: './new-bus' }),
       );
 
       // Reset cache to force re-resolution

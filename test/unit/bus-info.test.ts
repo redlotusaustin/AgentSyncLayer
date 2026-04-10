@@ -1,11 +1,11 @@
-import { describe, test, expect, afterEach } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { resetBusConfig } from '../../src/config';
-import { busInfoExecute } from '../../src/tools/bus_info';
-import { createTestBusEnv } from '../helpers';
-import { createTestToolContext } from '../fixtures';
 import { hashProjectPath } from '../../src/namespace';
-import * as fs from 'fs';
-import * as path from 'path';
+import { busInfoExecute } from '../../src/tools/bus_info';
+import { createTestToolContext } from '../fixtures';
+import { createTestBusEnv } from '../helpers';
 
 describe('bus-info (T7)', () => {
   afterEach(() => {
@@ -31,10 +31,7 @@ describe('bus-info (T7)', () => {
   test('T7.2: bus_info with .agentsynclayer.json → source: config, configPath set', async () => {
     const { root, cleanup } = createTestBusEnv();
     try {
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
       const context = createTestToolContext(root);
       const result = await busInfoExecute({}, context);

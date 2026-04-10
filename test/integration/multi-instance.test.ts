@@ -10,14 +10,14 @@
  * - Claims are visible across instances
  */
 
-import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import {
   createTestContext,
   createTestRedisClient,
-  generateTestProjectHash,
   generateTestAgentId,
-  waitFor,
+  generateTestProjectHash,
   isRedisAvailable,
+  waitFor,
 } from '../helpers';
 
 describe('Multi-Instance Communication', () => {
@@ -198,12 +198,18 @@ describe('Multi-Instance Communication', () => {
       const ttlSeconds = 300;
 
       // Agent A claims the file
-      const result = await redis.set(claimKey, JSON.stringify({
-        path,
-        agentId: agentA.id,
-        claimedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
-      }), 'EX', ttlSeconds, 'NX');
+      const result = await redis.set(
+        claimKey,
+        JSON.stringify({
+          path,
+          agentId: agentA.id,
+          claimedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+        }),
+        'EX',
+        ttlSeconds,
+        'NX',
+      );
 
       expect(result).toBe('OK');
 
@@ -221,11 +227,17 @@ describe('Multi-Instance Communication', () => {
       const claimKey = `opencode:${projectHash}:claim:${path}`;
 
       // Agent B tries to claim same file
-      const result = await redis.set(claimKey, JSON.stringify({
-        path,
-        agentId: agentB.id,
-        claimedAt: new Date().toISOString(),
-      }), 'EX', 300, 'NX');
+      const result = await redis.set(
+        claimKey,
+        JSON.stringify({
+          path,
+          agentId: agentB.id,
+          claimedAt: new Date().toISOString(),
+        }),
+        'EX',
+        300,
+        'NX',
+      );
 
       // Should fail (file already claimed)
       expect(result).toBeNull();
@@ -246,11 +258,17 @@ describe('Multi-Instance Communication', () => {
       expect(await redis.get(claimKey)).toBeNull();
 
       // Agent B can now claim
-      const result = await redis.set(claimKey, JSON.stringify({
-        path,
-        agentId: agentB.id,
-        claimedAt: new Date().toISOString(),
-      }), 'EX', 300, 'NX');
+      const result = await redis.set(
+        claimKey,
+        JSON.stringify({
+          path,
+          agentId: agentB.id,
+          claimedAt: new Date().toISOString(),
+        }),
+        'EX',
+        300,
+        'NX',
+      );
 
       expect(result).toBe('OK');
       expect(JSON.parse(await redis.get(claimKey)!).agentId).toBe(agentB.id);
@@ -386,11 +404,17 @@ describe('Two-Phase Commit Simulation', () => {
     await redis.zadd(coordChannel, Date.now() + 100, JSON.stringify(yesMsg));
 
     // Coordinator commits - acquires claim
-    const result = await redis.set(claimKey, JSON.stringify({
-      path,
-      agentId: coordinatorAgent,
-      claimedAt: new Date().toISOString(),
-    }), 'EX', 300, 'NX');
+    const result = await redis.set(
+      claimKey,
+      JSON.stringify({
+        path,
+        agentId: coordinatorAgent,
+        claimedAt: new Date().toISOString(),
+      }),
+      'EX',
+      300,
+      'NX',
+    );
 
     expect(result).toBe('OK');
 

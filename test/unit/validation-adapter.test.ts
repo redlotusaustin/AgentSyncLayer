@@ -15,11 +15,18 @@ import z from 'zod';
 
 // Define schemas inline to test them directly (matching adapter.ts definitions)
 const BusClaimArgsSchema = z.object({
-  path: z.string().min(1).max(512).describe("The file path to claim (relative, e.g. 'src/auth/login.ts')"),
+  path: z
+    .string()
+    .min(1)
+    .max(512)
+    .describe("The file path to claim (relative, e.g. 'src/auth/login.ts')"),
 });
 
 const BusReleaseArgsSchema = z.object({
-  path: z.string().max(512).describe("The file path to release (relative, e.g. 'src/auth/login.ts')"),
+  path: z
+    .string()
+    .max(512)
+    .describe("The file path to release (relative, e.g. 'src/auth/login.ts')"),
 });
 
 describe('T6: bus_claim Zod validation rejects empty path', () => {

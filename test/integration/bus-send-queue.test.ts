@@ -7,20 +7,14 @@
  * opencode:{projectHash}:queue exists.
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import {
-  RedisClient,
-  getRedisClient,
-  setRedisClient,
-  resetRedisClient,
-} from '../../src/redis';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { hashProjectPath } from '../../src/namespace';
+import { RedisClient, resetRedisClient, setRedisClient } from '../../src/redis';
 import { resetSessionAgentId, setSessionAgentId } from '../../src/session';
-import { busSendExecute } from '../../src/tools/bus_send';
-import { cleanupRateLimiter } from '../../src/tools/bus_send';
+import { busSendExecute, cleanupRateLimiter } from '../../src/tools/bus_send';
 import type { ToolContext } from '../../src/types';
 import { isRedisAvailable } from '../helpers';
 
@@ -48,7 +42,7 @@ function createTestDirectory(): { dir: string; cleanup: () => void } {
 describe('T8: bus_send does not write to queue key', () => {
   let redisWrapper: RedisClient;
   let testDir: { dir: string; cleanup: () => void };
-  let projectHash: string;
+  let _projectHash: string;
   let testContext: ToolContext;
 
   beforeAll(async () => {
@@ -71,7 +65,7 @@ describe('T8: bus_send does not write to queue key', () => {
 
   beforeEach(() => {
     testDir = createTestDirectory();
-    projectHash = hashProjectPath(testDir.dir);
+    _projectHash = hashProjectPath(testDir.dir);
     testContext = { directory: testDir.dir };
     setSessionAgentId(`test-agent-${Date.now()}`);
   });
@@ -108,7 +102,7 @@ describe('T8: bus_send does not write to queue key', () => {
     // Send a message via bus_send
     const result = await busSendExecute(
       { channel: 'general', message: 'Test message for queue key check' },
-      testContext
+      testContext,
     );
 
     // Verify the send was successful
@@ -130,24 +124,21 @@ describe('T8: bus_send does not write to queue key', () => {
     const client = redisWrapper.getClient();
 
     // Send a message
-    await busSendExecute(
-      { channel: 'test-channel', message: 'Another test message' },
-      testContext
-    );
+    await busSendExecute({ channel: 'test-channel', message: 'Another test message' }, testContext);
 
     // Check what keys DO exist
     const allKeys = await client.keys('opencode:*');
 
     // Verify history keys exist (opencode:{hash}:history:{channel})
-    const historyKeys = allKeys.filter(k => k.includes(':history:'));
+    const historyKeys = allKeys.filter((k) => k.includes(':history:'));
     expect(historyKeys.length).toBeGreaterThan(0);
 
     // Verify channels key exists (opencode:{hash}:channels)
-    const channelsKeys = allKeys.filter(k => k.includes(':channels'));
+    const channelsKeys = allKeys.filter((k) => k.includes(':channels'));
     expect(channelsKeys.length).toBeGreaterThan(0);
 
     // Verify NO queue keys exist
-    const queueKeys = allKeys.filter(k => k.includes(':queue'));
+    const queueKeys = allKeys.filter((k) => k.includes(':queue'));
     expect(queueKeys).toEqual([]);
   });
 
@@ -160,18 +151,9 @@ describe('T8: bus_send does not write to queue key', () => {
     const client = redisWrapper.getClient();
 
     // Send messages to multiple channels
-    await busSendExecute(
-      { channel: 'channel-a', message: 'Message to channel A' },
-      testContext
-    );
-    await busSendExecute(
-      { channel: 'channel-b', message: 'Message to channel B' },
-      testContext
-    );
-    await busSendExecute(
-      { channel: 'channel-c', message: 'Message to channel C' },
-      testContext
-    );
+    await busSendExecute({ channel: 'channel-a', message: 'Message to channel A' }, testContext);
+    await busSendExecute({ channel: 'channel-b', message: 'Message to channel B' }, testContext);
+    await busSendExecute({ channel: 'channel-c', message: 'Message to channel C' }, testContext);
 
     // Check for queue keys
     const queueKeys = await client.keys('opencode:*:queue');

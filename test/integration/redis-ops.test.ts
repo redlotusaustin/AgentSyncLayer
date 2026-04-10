@@ -10,17 +10,17 @@
  * These tests require a running Redis server on localhost:6379
  */
 
-import { describe, expect, test, beforeAll, afterAll, beforeEach } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import Redis from 'ioredis';
+import type { Message } from '../../src/types';
 import {
   createTestContext,
   createTestRedisClient,
-  generateTestProjectHash,
   generateTestAgentId,
-  waitFor,
+  generateTestProjectHash,
   isRedisAvailable,
+  waitFor,
 } from '../helpers';
-import type { Message } from '../../src/types';
 
 describe('Redis Operations', () => {
   const ctx = createTestContext();
@@ -243,12 +243,18 @@ describe('Redis Operations', () => {
       const ttlSeconds = 300;
 
       // Try to claim using SETNX (set if not exists)
-      const claimed = await redis.set(claimKey, JSON.stringify({
-        path,
-        agentId,
-        claimedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
-      }), 'EX', ttlSeconds, 'NX');
+      const claimed = await redis.set(
+        claimKey,
+        JSON.stringify({
+          path,
+          agentId,
+          claimedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+        }),
+        'EX',
+        ttlSeconds,
+        'NX',
+      );
 
       expect(claimed).toBe('OK');
 
@@ -265,18 +271,30 @@ describe('Redis Operations', () => {
       const claimKey = `opencode:${projectHash}:claim:${path}`;
 
       // First agent claims
-      await redis.set(claimKey, JSON.stringify({
-        path,
-        agentId: agent1,
-        claimedAt: new Date().toISOString(),
-      }), 'EX', 300, 'NX');
+      await redis.set(
+        claimKey,
+        JSON.stringify({
+          path,
+          agentId: agent1,
+          claimedAt: new Date().toISOString(),
+        }),
+        'EX',
+        300,
+        'NX',
+      );
 
       // Second agent tries to claim same file
-      const claimed = await redis.set(claimKey, JSON.stringify({
-        path,
-        agentId: agent2,
-        claimedAt: new Date().toISOString(),
-      }), 'EX', 300, 'NX');
+      const claimed = await redis.set(
+        claimKey,
+        JSON.stringify({
+          path,
+          agentId: agent2,
+          claimedAt: new Date().toISOString(),
+        }),
+        'EX',
+        300,
+        'NX',
+      );
 
       expect(claimed).toBeNull(); // Should fail
 
@@ -291,11 +309,17 @@ describe('Redis Operations', () => {
       const claimKey = `opencode:${projectHash}:claim:${path}`;
 
       // Create claim
-      await redis.set(claimKey, JSON.stringify({
-        path,
-        agentId,
-        claimedAt: new Date().toISOString(),
-      }), 'EX', 300, 'NX');
+      await redis.set(
+        claimKey,
+        JSON.stringify({
+          path,
+          agentId,
+          claimedAt: new Date().toISOString(),
+        }),
+        'EX',
+        300,
+        'NX',
+      );
 
       // Verify exists
       expect(await redis.exists(claimKey)).toBe(1);
@@ -314,11 +338,17 @@ describe('Redis Operations', () => {
       // Create claims
       for (const path of paths) {
         const claimKey = `opencode:${projectHash}:claim:${path}`;
-        await redis.set(claimKey, JSON.stringify({
-          path,
-          agentId: generateTestAgentId(),
-          claimedAt: new Date().toISOString(),
-        }), 'EX', 300, 'NX');
+        await redis.set(
+          claimKey,
+          JSON.stringify({
+            path,
+            agentId: generateTestAgentId(),
+            claimedAt: new Date().toISOString(),
+          }),
+          'EX',
+          300,
+          'NX',
+        );
       }
 
       // Scan

@@ -8,15 +8,11 @@
  * Tests: T8.1-T8.4
  */
 
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import {
-  getSqliteClient,
-  closeSqliteClient,
-  SqliteClient,
-} from '../../src/sqlite';
+import { describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { closeSqliteClient, getSqliteClient, SqliteClient } from '../../src/sqlite';
 
 describe('T8: SQLite DB Placement', () => {
   describe('T8.1: DB created at {dbDir}/.agentsynclayer/history.db', () => {
@@ -95,7 +91,7 @@ describe('T8: SQLite DB Placement', () => {
       try {
         const clients: SqliteClient[] = [];
         for (let i = 0; i < 5; i++) {
-          clients.push(getSqliteClient(tempDir, 'testHash' + i)!);
+          clients.push(getSqliteClient(tempDir, `testHash${i}`)!);
         }
 
         // All references should be equal
@@ -141,7 +137,7 @@ describe('T8: SQLite DB Placement', () => {
 
     test('symlinked directories get different instances (singleton keyed by raw path)', () => {
       const tempDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-orig-'));
-      const linkDir = path.join(os.tmpdir(), 'agentsynclayer-link-' + Date.now());
+      const linkDir = path.join(os.tmpdir(), `agentsynclayer-link-${Date.now()}`);
       fs.symlinkSync(tempDir1, linkDir);
 
       try {
@@ -159,7 +155,11 @@ describe('T8: SQLite DB Placement', () => {
         closeSqliteClient(tempDir1);
         closeSqliteClient(linkDir);
         fs.rmSync(tempDir1, { recursive: true, force: true });
-        try { fs.rmSync(linkDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        try {
+          fs.rmSync(linkDir, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
       }
     });
   });

@@ -1,8 +1,8 @@
-import { describe, test, expect, afterEach } from 'bun:test';
-import { resolveBusConfig, resetBusConfig } from '../../src/config';
+import { afterEach, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { resetBusConfig, resolveBusConfig } from '../../src/config';
 import { createTestBusEnv } from '../helpers';
-import * as fs from 'fs';
-import * as path from 'path';
 
 describe('config-errors (T5)', () => {
   afterEach(() => {
@@ -12,10 +12,7 @@ describe('config-errors (T5)', () => {
   test('T5.1: malformed JSON → source: default', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        '{ invalid json }'
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), '{ invalid json }');
 
       const config = resolveBusConfig(root);
       expect(config.source).toBe('default');
@@ -27,10 +24,7 @@ describe('config-errors (T5)', () => {
   test('T5.2: valid JSON but bus: 123 (wrong type) → source: default', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: 123 })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: 123 }));
 
       const config = resolveBusConfig(root);
       expect(config.source).toBe('default');
@@ -44,7 +38,7 @@ describe('config-errors (T5)', () => {
     try {
       fs.writeFileSync(
         path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '/non/existent/path' })
+        JSON.stringify({ bus: '/non/existent/path' }),
       );
 
       const config = resolveBusConfig(root);
@@ -64,7 +58,7 @@ describe('config-errors (T5)', () => {
       // Create .agentsynclayer.json pointing to that file
       fs.writeFileSync(
         path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: './not-a-directory.txt' })
+        JSON.stringify({ bus: './not-a-directory.txt' }),
       );
 
       const config = resolveBusConfig(root);
@@ -85,7 +79,7 @@ describe('config-errors (T5)', () => {
           unknownField: 'should be ignored',
           anotherUnknown: 123,
           nested: { key: 'value' },
-        })
+        }),
       );
 
       const config = resolveBusConfig(root);

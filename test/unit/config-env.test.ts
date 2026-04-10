@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeAll, afterAll, afterEach } from 'bun:test';
-import { resolveBusConfig, resetBusConfig } from '../../src/config';
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { resetBusConfig, resolveBusConfig } from '../../src/config';
 import { createTestBusEnv } from '../helpers';
-import * as fs from 'fs';
-import * as path from 'path';
 
 describe('config-env (T2)', () => {
   const originalEnvBusId = process.env.AGENTSYNCLAYER_BUS_ID;
@@ -68,10 +68,7 @@ describe('config-env (T2)', () => {
       fs.mkdirSync(subdir1, { recursive: true });
       fs.mkdirSync(subdir2, { recursive: true });
 
-      fs.writeFileSync(
-        path.join(root, '.agentsynclayer.json'),
-        JSON.stringify({ bus: subdir1 })
-      );
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: subdir1 }));
 
       // But env var points to subdir2
       process.env.AGENTSYNCLAYER_BUS_ID = subdir2;

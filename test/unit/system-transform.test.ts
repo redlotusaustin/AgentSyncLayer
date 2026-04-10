@@ -17,8 +17,8 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import type { Message } from '../../src/types';
 import { buildNotificationText } from '../../src/tools/notifications';
+import type { Message } from '../../src/types';
 
 describe('system-transform hook unit tests', () => {
   describe('T7.1: injects notifications when unread messages exist', () => {
@@ -138,9 +138,9 @@ describe('system-transform hook unit tests', () => {
       const output = lines.join('\n');
 
       // Preview should be first 60 chars (60 A's + quotes around it)
-      expect(output).toContain('"' + 'A'.repeat(60) + '"');
+      expect(output).toContain(`"${'A'.repeat(60)}"`);
       // Should not contain more than 60 A's before closing quote
-      expect(output).not.toContain('"' + 'A'.repeat(61));
+      expect(output).not.toContain(`"${'A'.repeat(61)}`);
     });
 
     test('includes full text if under 60 characters', () => {
