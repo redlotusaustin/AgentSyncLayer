@@ -68,7 +68,7 @@ describe('config-errors (T5)', () => {
     }
   });
 
-  test('T5.5: unknown fields → ignored, resolves normally', () => {
+  test('T5.5: unknown fields → rejected, resolves to default', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
@@ -76,15 +76,15 @@ describe('config-errors (T5)', () => {
         JSON.stringify({
           bus: '.',
           db: '.',
-          unknownField: 'should be ignored',
+          unknownField: 'should be rejected',
           anotherUnknown: 123,
           nested: { key: 'value' },
         }),
       );
 
+      // Strict Zod schema rejects unknown fields, causing fallback to default
       const config = resolveBusConfig(root);
-      expect(config.source).toBe('config');
-      expect(config.bus_dir).toBe(root);
+      expect(config.source).toBe('default');
     } finally {
       cleanup();
     }

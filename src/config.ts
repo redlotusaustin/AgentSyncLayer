@@ -17,6 +17,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { z } from 'zod';
+
 import { hashProjectPath } from './namespace';
 
 /**
@@ -153,6 +155,15 @@ function resolveFromEnv(): BusConfig | null {
   try {
     const busDir = fs.realpathSync(envValue);
 
+    // Log resolved path for operator transparency
+    console.warn(
+      '[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID resolved to:',
+      busDir,
+      '(from:',
+      envValue,
+      ')',
+    );
+
     // Validate it's a directory
     if (!fs.statSync(busDir).isDirectory()) {
       console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID is not a directory:', envValue);
@@ -197,6 +208,14 @@ function resolveFromLocalConfig(canonicalCwd: string): BusConfig | null {
   }
 }
 
+/** Zod schema for .agentsynclayer.json config file */
+const ConfigFileSchema = z
+  .object({
+    bus: z.string().optional(),
+    db: z.string().optional(),
+  })
+  .strict();
+
 /**
  * Parse a .agentsynclayer.json config file.
  *
@@ -206,16 +225,25 @@ function resolveFromLocalConfig(canonicalCwd: string): BusConfig | null {
  * @throws Error if parsing fails or paths are invalid
  */
 function parseConfig(configPath: string, configDir: string): BusConfig {
-  // Read and parse JSON
+  // Read, validate, and parse JSON
   let raw: AgentSyncLayerConfigFile;
   try {
-    raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const fileContent = fs.readFileSync(configPath, 'utf-8');
+    raw = ConfigFileSchema.parse(JSON.parse(fileContent));
   } catch (error) {
-    console.warn(
-      '[AgentSyncLayer] Failed to read/parse config file:',
-      configPath,
-      error instanceof Error ? error.message : String(error),
-    );
+    if (error instanceof z.ZodError) {
+      console.warn(
+        '[AgentSyncLayer] Invalid config file (unknown keys):',
+        configPath,
+        error.errors.map((e) => e.message).join(', '),
+      );
+    } else {
+      console.warn(
+        '[AgentSyncLayer] Failed to read/parse config file:',
+        configPath,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
     throw new Error('Failed to parse config');
   }
 
@@ -251,11 +279,12 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
 
   // Warn if either dir is outside project tree (trust model)
   if (!dbDir.startsWith(configDir) || !busDir.startsWith(configDir)) {
-    const outside = [];
-    if (!dbDir.startsWith(configDir)) outside.push('db_dir');
-    if (!busDir.startsWith(configDir)) outside.push('bus_dir');
     console.warn(
-      `[AgentSyncLayer] ${outside.join(' and ')} ${outside.length === 1 ? 'is' : 'are'} outside the project tree. This may indicate a misconfiguration or intentional cross-project shared bus.`,
+      '[AgentSyncLayer] bus_dir or db_dir is outside the config directory.',
+      'Resolved bus_dir:',
+      busDir,
+      'Config directory:',
+      configDir,
     );
   }
 
