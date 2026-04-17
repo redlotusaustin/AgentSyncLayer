@@ -277,16 +277,6 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
     throw new Error('Invalid db directory');
   }
 
-  // Warn if either dir is outside project tree (trust model)
-  if (!dbDir.startsWith(configDir) || !busDir.startsWith(configDir)) {
-    console.warn(
-      '[AgentSyncLayer] bus_dir or db_dir is outside the config directory.',
-      'Resolved bus_dir:',
-      busDir,
-      'Config directory:',
-      configDir,
-    );
-  }
 
   // Ensure db_dir is creatable
   try {
