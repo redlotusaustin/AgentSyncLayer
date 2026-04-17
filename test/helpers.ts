@@ -278,11 +278,6 @@ export class MockTime {
 }
 
 /**
- * SQLite test database configuration
- */
-const _TEST_DB_PATH = '.agentsynclayer/history.db';
-
-/**
  * Create a test SQLite database in a temporary directory
  *
  * Usage:

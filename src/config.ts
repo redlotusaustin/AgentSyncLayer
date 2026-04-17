@@ -159,20 +159,17 @@ function resolveFromEnv(): BusConfig | null {
       return null;
     }
 
-    // db_dir is same as bus_dir when using env var
-    const dbDir = busDir;
-
-    // Validate db_dir is creatable (mkdir -p will create it)
+    // Validate bus_dir is creatable (mkdir -p will create it)
     try {
-      fs.mkdirSync(dbDir, { recursive: true });
+      fs.mkdirSync(busDir, { recursive: true });
     } catch {
-      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID db_dir is not creatable:', dbDir);
+      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID db_dir is not creatable:', busDir);
       return null;
     }
 
     return {
       bus_dir: busDir,
-      db_dir: dbDir,
+      db_dir: busDir,
       projectHash: hashProjectPath(busDir),
       source: 'env',
       configPath: null,
@@ -193,17 +190,11 @@ function resolveFromEnv(): BusConfig | null {
  */
 function resolveFromLocalConfig(canonicalCwd: string): BusConfig | null {
   const configPath = path.join(canonicalCwd, '.agentsynclayer.json');
-
-  if (fs.existsSync(configPath)) {
-    try {
-      return parseConfig(configPath, canonicalCwd);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('[AgentSyncLayer] Invalid config in:', configPath, message);
-    }
+  try {
+    return parseConfig(configPath, canonicalCwd);
+  } catch {
+    return null;
   }
-
-  return null;
 }
 
 /**
@@ -218,8 +209,7 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
   // Read and parse JSON
   let raw: AgentSyncLayerConfigFile;
   try {
-    const content = fs.readFileSync(configPath, 'utf-8');
-    raw = JSON.parse(content);
+    raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
   } catch (error) {
     console.warn(
       '[AgentSyncLayer] Failed to read/parse config file:',
@@ -233,51 +223,37 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
   const busRelative = raw.bus ?? '.';
   let busDir: string;
   try {
-    if (path.isAbsolute(busRelative)) {
-      busDir = fs.realpathSync(busRelative);
-    } else {
-      busDir = fs.realpathSync(path.join(configDir, busRelative));
-    }
+    busDir = path.isAbsolute(busRelative)
+      ? fs.realpathSync(busRelative)
+      : fs.realpathSync(path.join(configDir, busRelative));
   } catch {
     console.warn('[AgentSyncLayer] Config bus directory could not be resolved:', busRelative);
     throw new Error('Invalid bus directory');
   }
 
   // Validate bus_dir is a directory
-  try {
-    if (!fs.statSync(busDir).isDirectory()) {
-      console.warn('[AgentSyncLayer] Config bus is not a directory:', busDir);
-      throw new Error('bus is not a directory');
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message === 'bus is not a directory') {
-      throw error;
-    }
-    console.warn('[AgentSyncLayer] Config bus directory does not exist:', busDir);
-    throw new Error('bus directory does not exist');
+  if (!fs.statSync(busDir).isDirectory()) {
+    console.warn('[AgentSyncLayer] Config bus is not a directory:', busDir);
+    throw new Error('bus is not a directory');
   }
 
   // Resolve db_dir (default: same relative value as bus)
   const dbRelative = raw.db ?? raw.bus ?? '.';
   let dbDir: string;
   try {
-    if (path.isAbsolute(dbRelative)) {
-      dbDir = fs.realpathSync(dbRelative);
-    } else {
-      dbDir = fs.realpathSync(path.join(configDir, dbRelative));
-    }
+    dbDir = path.isAbsolute(dbRelative)
+      ? fs.realpathSync(dbRelative)
+      : fs.realpathSync(path.join(configDir, dbRelative));
   } catch {
     console.warn('[AgentSyncLayer] Config db directory could not be resolved:', dbRelative);
     throw new Error('Invalid db directory');
   }
 
-  // Warn if either db_dir or bus_dir is outside the project tree (trust model)
-  const dbOutside = !dbDir.startsWith(configDir);
-  const busOutside = !busDir.startsWith(configDir);
-  if (dbOutside || busOutside) {
+  // Warn if either dir is outside project tree (trust model)
+  if (!dbDir.startsWith(configDir) || !busDir.startsWith(configDir)) {
     const outside = [];
-    if (dbOutside) outside.push('db_dir');
-    if (busOutside) outside.push('bus_dir');
+    if (!dbDir.startsWith(configDir)) outside.push('db_dir');
+    if (!busDir.startsWith(configDir)) outside.push('bus_dir');
     console.warn(
       `[AgentSyncLayer] ${outside.join(' and ')} ${outside.length === 1 ? 'is' : 'are'} outside the project tree. This may indicate a misconfiguration or intentional cross-project shared bus.`,
     );
