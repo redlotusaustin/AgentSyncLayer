@@ -3,7 +3,7 @@
  *
  * Handles resolution of bus identity configuration from multiple sources:
  * 1. Environment variable: AGENTSYNCLAYER_BUS_ID (highest priority)
- * 2. Config file: .agentsynclayer.json (discovered via ancestor walk)
+ * 2. Config file: .agentsynclayer.json (in current directory only)
  * 3. Default: use cwd as bus identity (lowest priority)
  *
  * The resolved configuration determines:
@@ -87,7 +87,7 @@ export function resetBusConfig(): void {
  *
  * Resolution order:
  * 1. AGENTSYNCLAYER_BUS_ID environment variable (highest priority)
- * 2. .agentsynclayer.json file via ancestor walk (CWD to git root)
+ * 2. .agentsynclayer.json file in current directory only (no ancestor walk)
  * 3. Default: use cwd as bus identity
  *
  * Results are cached per canonical cwd. Subsequent calls return
@@ -126,8 +126,8 @@ export function resolveBusConfig(cwd: string): BusConfig {
     return config;
   }
 
-  // Phase 2: Ancestor walk for .agentsynclayer.json
-  config = resolveFromAncestorWalk(canonicalCwd);
+  // Phase 2: Check for config in current directory only
+  config = resolveFromLocalConfig(canonicalCwd);
   if (config) {
     configCache.set(canonicalCwd, config);
     return config;
@@ -184,41 +184,23 @@ function resolveFromEnv(): BusConfig | null {
 }
 
 /**
- * Walk up the directory tree from cwd to find .agentsynclayer.json.
+ * Check for .agentsynclayer.json in the current directory only.
  *
- * Stops when reaching filesystem root or a directory containing .git/
+ * Does NOT walk up the directory tree (no ancestor walk).
  *
  * @param canonicalCwd - Canonical current working directory
  * @returns BusConfig if config file found and valid, null otherwise
  */
-function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
-  let dir = canonicalCwd;
+function resolveFromLocalConfig(canonicalCwd: string): BusConfig | null {
+  const configPath = path.join(canonicalCwd, '.agentsynclayer.json');
 
-  // Walk up until we hit filesystem root or .git/ directory
-  while (dir !== path.dirname(dir)) {
-    const configPath = path.join(dir, '.agentsynclayer.json');
-    const gitPath = path.join(dir, '.git');
-
-    // Check config first — config at git root should be used.
-    // .git only stops upward walk when no config at this level.
-    if (fs.existsSync(configPath)) {
-      try {
-        return parseConfig(configPath, dir);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[AgentSyncLayer] Invalid config in:', configPath, message);
-      }
-    }
-
-    // Check if we've hit a git root (only after confirming no config)
+  if (fs.existsSync(configPath)) {
     try {
-      fs.statSync(gitPath);
-      break;
-    } catch {
-      // Not at git root, continue walking
+      return parseConfig(configPath, canonicalCwd);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[AgentSyncLayer] Invalid config in:', configPath, message);
     }
-
-    dir = path.dirname(dir);
   }
 
   return null;

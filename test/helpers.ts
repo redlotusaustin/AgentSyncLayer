@@ -479,7 +479,7 @@ export function createTestBusEnv(config?: Record<string, string>): {
 }
 
 /**
- * Create a temporary directory tree for ancestor walk tests.
+ * Create a temporary directory tree for config tests.
  *
  * Creates: root/packages/api, root/packages/web
  *
@@ -489,7 +489,7 @@ export function createTestBusEnv(config?: Record<string, string>): {
  * const { root, sub1, sub2, cleanup } = createTestDirTree();
  * // Create config in root
  * fs.writeFileSync(path.join(root, '.agentsynclayer.json'), '{}');
- * // Test from sub1 - should find ancestor config
+ * // Run from sub1 - local config only, ancestor NOT searched
  * cleanup();
  */
 export function createTestDirTree(): {
