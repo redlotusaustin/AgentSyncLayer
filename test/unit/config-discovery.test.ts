@@ -1,35 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { resetBusConfig, resolveBusConfig } from '../../src/config';
-import { createTestBusEnv } from '../helpers';
-
-/**
- * Create a test directory tree for config tests.
- * Creates: root/packages/api, root/packages/web
- */
-function createTestDirTree(): {
-  root: string;
-  sub1: string;
-  sub2: string;
-  cleanup: () => void;
-} {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsynclayer-tree-test-'));
-  const sub1 = path.join(root, 'packages', 'api');
-  const sub2 = path.join(root, 'packages', 'web');
-  fs.mkdirSync(sub1, { recursive: true });
-  fs.mkdirSync(sub2, { recursive: true });
-  return {
-    root,
-    sub1,
-    sub2,
-    cleanup: () => {
-      resetBusConfig();
-      fs.rmSync(root, { recursive: true, force: true });
-    },
-  };
-}
+import { createTestBusEnv, createTestDirTree } from '../helpers';
 
 describe('config-discovery (T3)', () => {
   afterEach(() => {
@@ -55,6 +28,7 @@ describe('config-discovery (T3)', () => {
     // Should not crash and should return some result
     expect(config).toBeDefined();
     expect(['default', 'config']).toContain(config.source);
+    expect(config.configPath).toBeNull();
   });
 
   test('T3.6: .agentsynclayer.json with {} (empty) → bus_dir defaults to config file dir', () => {
@@ -119,7 +93,7 @@ describe('config-discovery (T3)', () => {
   });
 
   test('T3.11: each subdirectory has independent default config', () => {
-    const { root, sub1, sub2, cleanup } = createTestDirTree();
+    const { sub1, sub2, cleanup } = createTestDirTree();
     try {
       // No config files anywhere
 
@@ -147,14 +121,8 @@ describe('config-discovery (T3)', () => {
     const { root, sub1, sub2, cleanup } = createTestDirTree();
     try {
       // Config files in each package (for local config mode)
-      fs.writeFileSync(
-        path.join(sub1, '.agentsynclayer.json'),
-        JSON.stringify({ bus: root }),
-      );
-      fs.writeFileSync(
-        path.join(sub2, '.agentsynclayer.json'),
-        JSON.stringify({ bus: root }),
-      );
+      fs.writeFileSync(path.join(sub1, '.agentsynclayer.json'), JSON.stringify({ bus: root }));
+      fs.writeFileSync(path.join(sub2, '.agentsynclayer.json'), JSON.stringify({ bus: root }));
 
       // Both should resolve to root for shared bus
       const apiConfig = resolveBusConfig(sub1);
@@ -172,7 +140,7 @@ describe('config-discovery (T3)', () => {
   });
 
   test('T3.13: each monorepo package gets independent default when no config', () => {
-    const { root, sub1, sub2, cleanup } = createTestDirTree();
+    const { sub1, sub2, cleanup } = createTestDirTree();
     try {
       // No config files anywhere
 
@@ -190,6 +158,57 @@ describe('config-discovery (T3)', () => {
 
       // They have different namespaces (no shared bus)
       expect(apiConfig.projectHash).not.toBe(webConfig.projectHash);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.9: config with {"bus": "../.."} → resolves relative to CWD', () => {
+    const { root, sub1, cleanup } = createTestDirTree();
+    try {
+      fs.writeFileSync(path.join(sub1, '.agentsynclayer.json'), JSON.stringify({ bus: '../..' }));
+      const config = resolveBusConfig(sub1);
+      expect(config.source).toBe('config');
+      expect(config.bus_dir).toBe(root);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.10: config with absolute {"bus": "/tmp"} → uses absolute path', () => {
+    const { root, cleanup } = createTestBusEnv();
+    try {
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '/tmp' }));
+      const config = resolveBusConfig(root);
+      expect(config.source).toBe('config');
+      expect(config.bus_dir).toBe('/tmp');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.12: malformed JSON in CWD config → falls through to default', () => {
+    const { root, cleanup } = createTestBusEnv();
+    try {
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), '{ invalid json }');
+      const config = resolveBusConfig(root);
+      expect(config.source).toBe('default');
+      expect(config.bus_dir).toBe(root);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.13: config with non-existent bus dir → falls through to default', () => {
+    const { root, cleanup } = createTestBusEnv();
+    try {
+      fs.writeFileSync(
+        path.join(root, '.agentsynclayer.json'),
+        JSON.stringify({ bus: '/nonexistent/path/that/does/not/exist' }),
+      );
+      const config = resolveBusConfig(root);
+      expect(config.source).toBe('default');
+      expect(config.bus_dir).toBe(root);
     } finally {
       cleanup();
     }

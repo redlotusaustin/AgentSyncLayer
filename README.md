@@ -188,10 +188,10 @@ Place `.agentsynclayer.json` in each package that needs the shared bus:
 
 ```json
 // /mono/packages/api/.agentsynclayer.json
-{ "bus": "/" }
+{ "bus": "../.." }
 
 // /mono/packages/web/.agentsynclayer.json
-{ "bus": "/" }
+{ "bus": "../.." }
 ```
 
 Now agents in `/mono/packages/api` and `/mono/packages/web` share the same bus, see each other's messages, and use the same SQLite history database.
@@ -758,7 +758,7 @@ bus_send(channel="my-channel", message="Hello")
 
 **Cause**: Different project namespaces.
 
-**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). In monorepos, ensure `.agentsynclayer.json` is at the shared root.
+**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). Ensure each directory has its own `.agentsynclayer.json` pointing to the shared bus.
 
 ### Verifying bus configuration
 
