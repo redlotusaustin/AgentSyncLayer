@@ -5,6 +5,23 @@ All notable changes to AgentSyncLayer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-04-17
+
+### Changed
+- **Breaking**: Replaced ancestor walk config discovery with local-config-only resolution
+- Config file `.agentsynclayer.json` is now searched only in current working directory (no ancestor walk)
+- For monorepo support, each package must have its own `.agentsynclayer.json` pointing to the shared bus root
+- Simplified config resolution logic, removed redundant variables
+
+### Fixed
+- Zod v4 error handling in parseConfig (different error shape)
+- README inconsistencies for local-config-only behavior
+
+### Added
+- New tests for local-config-only discovery (T3.8-T3.17)
+- Integration tests for monorepo cross-directory communication (I1.1-I1.4)
+- Config error handling tests (T5.1-T5.5)
+
 ## [0.5.2] - 2026-04-09
 
 ### Changed

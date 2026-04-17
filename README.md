@@ -2,7 +2,7 @@
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.5.0
+Version 0.6.0
 
 ---
 
@@ -181,6 +181,7 @@ For monorepos and multi-project setups, you can share a bus namespace across dif
 1. AgentSyncLayer looks for `.agentsynclayer.json` in the current working directory only (no ancestor walk)
 2. The config file's `bus` directory determines the project hash
 3. All agents pointing to the same `bus` directory share the same Redis namespace and SQLite database
+4. For monorepos, place `.agentsynclayer.json` in **each** package that needs the shared bus
 
 **Example: Monorepo**
 
@@ -198,7 +199,7 @@ Now agents in `/mono/packages/api` and `/mono/packages/web` share the same bus, 
 
 **Configuration precedence (highest to lowest):**
 1. `AGENTSYNCLAYER_BUS_ID` environment variable
-2. `.agentsynclayer.json` in current directory only
+2. `.agentsynclayer.json` in current directory only (no ancestor walk)
 3. Default: use current working directory
 
 ---
@@ -758,7 +759,7 @@ bus_send(channel="my-channel", message="Hello")
 
 **Cause**: Different project namespaces.
 
-**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). Ensure each directory has its own `.agentsynclayer.json` pointing to the shared bus.
+**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). In monorepos, ensure each package has its own `.agentsynclayer.json` pointing to the shared bus root.
 
 ### Verifying bus configuration
 
