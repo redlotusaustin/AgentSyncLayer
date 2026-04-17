@@ -235,7 +235,7 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
       console.warn(
         '[AgentSyncLayer] Invalid config file (unknown keys):',
         configPath,
-        error.errors.map((e) => e.message).join(', '),
+        error.issues.map((e) => e.message).join(', '),
       );
     } else {
       console.warn(
