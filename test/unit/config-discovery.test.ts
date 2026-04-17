@@ -163,7 +163,7 @@ describe('config-discovery (T3)', () => {
     }
   });
 
-  test('T3.9: config with {"bus": "../.."} → resolves relative to CWD', () => {
+  test('T3.14: config with {"bus": "../.."} → resolves relative to CWD', () => {
     const { root, sub1, cleanup } = createTestDirTree();
     try {
       fs.writeFileSync(path.join(sub1, '.agentsynclayer.json'), JSON.stringify({ bus: '../..' }));
@@ -175,7 +175,7 @@ describe('config-discovery (T3)', () => {
     }
   });
 
-  test('T3.10: config with absolute {"bus": "/tmp"} → uses absolute path', () => {
+  test('T3.15: config with absolute {"bus": "/tmp"} → uses absolute path', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '/tmp' }));
@@ -187,7 +187,7 @@ describe('config-discovery (T3)', () => {
     }
   });
 
-  test('T3.12: malformed JSON in CWD config → falls through to default', () => {
+  test('T3.16: malformed JSON in CWD config → falls through to default', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(path.join(root, '.agentsynclayer.json'), '{ invalid json }');
@@ -199,7 +199,7 @@ describe('config-discovery (T3)', () => {
     }
   });
 
-  test('T3.13: config with non-existent bus dir → falls through to default', () => {
+  test('T3.17: config with non-existent bus dir → falls through to default', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       fs.writeFileSync(
