@@ -73,6 +73,7 @@ export class RedisClient {
   private _connected = false;
   private _state: ConnectionState = 'disconnected';
   private connectionPromise: Promise<void> | null = null;
+  private retryCount = 0;
 
   /**
    * Create a new Redis client wrapper
