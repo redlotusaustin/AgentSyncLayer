@@ -5,7 +5,7 @@
  * according to the rules specified in contract.md.
  */
 
-import type { ErrorCode } from './types';
+import type { ErrorCode, MessageType } from './types';
 
 /** Channel name pattern: 1-64 alphanumeric, hyphen, underscore chars */
 const CHANNEL_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -101,7 +101,7 @@ export function validateMessage(text: string): string {
  */
 export function validateFilePath(path: unknown): string {
   if (typeof path !== 'string') {
-    return '';
+    throw new ValidationException('File path must be a string', 'PATH_INVALID');
   }
   // Normalize backslashes to forward slashes
   const normalized = path.trim().replace(/\\/g, '/');
@@ -125,6 +125,9 @@ export function validateFilePath(path: unknown): string {
   return normalized;
 }
 
+/** Valid message type values derived from the MessageType union */
+const VALID_MESSAGE_TYPES: readonly MessageType[] = ['info', 'status', 'error', 'coordination', 'claim', 'release'];
+
 /**
  * Validate a message type is one of the allowed values
  *
@@ -132,17 +135,15 @@ export function validateFilePath(path: unknown): string {
  * @returns The validated message type
  * @throws ValidationException if type is invalid
  */
-export function validateMessageType(type: string): string {
-  const validTypes = ['info', 'status', 'error', 'coordination', 'claim', 'release'];
-
-  if (!validTypes.includes(type)) {
+export function validateMessageType(type: string): MessageType {
+  if (!(VALID_MESSAGE_TYPES as readonly string[]).includes(type)) {
     throw new ValidationException(
-      `Invalid message type: must be one of ${validTypes.join(', ')}`,
+      `Invalid message type: must be one of ${VALID_MESSAGE_TYPES.join(', ')}`,
       'TYPE_INVALID',
     );
   }
 
-  return type;
+  return type as MessageType;
 }
 
 /**
