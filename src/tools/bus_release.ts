@@ -82,6 +82,15 @@ export async function busReleaseExecute(
     };
   }
 
+  // Guard against missing or malformed context (defense-in-depth)
+  if (!context || typeof context.directory !== 'string') {
+    return {
+      ok: false,
+      error: 'Tool context is missing or malformed',
+      code: 'INVALID_CONTEXT',
+    };
+  }
+
   try {
     // Validate path
     const filePath = validateFilePath(args.path);

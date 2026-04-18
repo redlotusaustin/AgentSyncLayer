@@ -27,9 +27,13 @@ export async function busAgentsExecute(
     return unavailableResponse();
   }
 
+  // Guard against missing or malformed context (defense-in-depth)
+  if (!context || typeof context.directory !== 'string') {
+    return unavailableResponse();
+  }
+
   try {
-    const dir = context?.directory || '.';
-    const agents = await getActiveAgents(resolveProjectHash(dir));
+    const agents = await getActiveAgents(resolveProjectHash(context.directory));
     return { ok: true, data: { agents, count: agents.length } };
   } catch (error) {
     console.error('[bus_agents] Error:', error);
