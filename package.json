@@ -1,6 +1,6 @@
 {
   "name": "opencode-asl",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Redis-backed pub/sub messaging for coordinating multiple AI agent sessions",
   "license": "MIT",
   "type": "module",
