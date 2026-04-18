@@ -202,7 +202,11 @@ function resolveFromLocalConfig(canonicalCwd: string): BusConfig | null {
   try {
     return parseConfig(configPath, canonicalCwd);
   } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EACCES') {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code === 'EACCES'
+    ) {
       console.warn(`[AgentSyncLayer] Permission denied reading config: ${configPath}`);
     }
     return null;

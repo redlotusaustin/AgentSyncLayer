@@ -126,7 +126,14 @@ export function validateFilePath(path: unknown): string {
 }
 
 /** Valid message type values derived from the MessageType union */
-const VALID_MESSAGE_TYPES: readonly MessageType[] = ['info', 'status', 'error', 'coordination', 'claim', 'release'];
+const VALID_MESSAGE_TYPES: readonly MessageType[] = [
+  'info',
+  'status',
+  'error',
+  'coordination',
+  'claim',
+  'release',
+];
 
 /**
  * Validate a message type is one of the allowed values

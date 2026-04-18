@@ -8,8 +8,8 @@
 import { resolveProjectHash } from '../config';
 import { getRedisClient } from '../redis';
 import { getSessionAgentId } from '../session';
-import { validateFilePath, validateChannel } from '../validation';
 import type { AgentStatus, StatusResponseData, ToolContext, ToolResponse } from '../types';
+import { validateChannel, validateFilePath } from '../validation';
 
 /**
  * Tool arguments for bus_status
