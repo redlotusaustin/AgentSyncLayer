@@ -362,6 +362,10 @@ export class RedisClient {
 /**
  * Default Redis client instance
  *
+ * Note: Redis client is a module-level singleton that persists across sessions.
+ * This is intentional — reconnecting on every session would add unnecessary latency.
+ * The client handles reconnection internally via ioredis.
+ *
  * Created lazily on first access. Can be overridden by setting
  * a new instance directly.
  */

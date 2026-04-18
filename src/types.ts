@@ -194,14 +194,6 @@ export interface ClaimConflictData {
 }
 
 /**
- * Claim conflict error response
- */
-export interface ClaimConflictError extends ErrorResponse {
-  code: 'CLAIM_CONFLICT';
-  data: ClaimConflictData;
-}
-
-/**
  * Response data for bus_release tool
  */
 export interface ReleaseResponseData {
@@ -297,11 +289,3 @@ export type ToolExecute<T extends ToolArgs, R> = (
  * Redis key types for namespace construction
  */
 export type KeyType = 'ch' | 'history' | 'agent' | 'claim' | 'channels' | 'lastseen';
-
-/**
- * Validation error structure
- */
-export interface ValidationError {
-  message: string;
-  code: ErrorCode;
-}

@@ -70,6 +70,7 @@ const BUS_INSTRUCTIONS: string[] = [
   '- When blocked: use bus_send to ask other agents for help or context',
   '- To check for messages: bus_read (recent), bus_history (deep archive), bus_search (full-text)',
   '- To discover channels: bus_channels. To see who is active: bus_agents.',
+  '- To check bus configuration: bus_info.',
   '',
   'Reply to unread message notifications promptly. Use bus_read to get full details.',
 ];

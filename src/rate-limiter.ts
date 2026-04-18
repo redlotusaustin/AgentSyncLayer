@@ -1,4 +1,10 @@
 /**
+ * In-memory sliding window rate limiter.
+ *
+ * Limitation: Rate limits are per-process only. Multiple OpenCode instances
+ * sharing the same bus do not share rate limit state. A distributed
+ * Redis-based rate limiter would be needed for cross-process enforcement.
+ *
  * Rate limiter for AgentSyncLayer message throttling
  *
  * Implements a sliding window rate limiter that allows a maximum
