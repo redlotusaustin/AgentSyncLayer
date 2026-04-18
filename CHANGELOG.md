@@ -5,6 +5,20 @@ All notable changes to AgentSyncLayer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-04-17
+
+### Fixed
+- **Critical**: Eliminated zod version conflict that caused NPM plugin loading crash
+  - Removed standalone `zod` dependency — now imports via `@opencode-ai/plugin`'s `tool.schema`
+  - Ensures single zod instance, fixing the `_zod.def` crash when loaded via NPM
+- Replaced zod schema validation in config.ts with manual validation (removes runtime zod usage)
+- Suppressed noisy ENOENT debug log on startup when `.agentsynclayer.json` does not exist
+- Added `console.warn` in `toAslContext()` guard for better debuggability on malformed context
+
+### Changed
+- Replaced local `defineTool()` helper with SDK's `tool()` function (removed unnecessary abstraction)
+- Removed `zod` from package.json dependencies (-1 dep)
+
 ## [0.6.0] - 2026-04-17
 
 ### Changed
