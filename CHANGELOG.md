@@ -5,6 +5,32 @@ All notable changes to AgentSyncLayer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5] - 2026-04-18
+
+### Fixed
+- **Critical**: Added `./server` subpath export to package.json — OpenCode imports plugins via `packageName/server`, not `packageName`. Missing export caused silent import failure, returning `undefined`, which crashed OpenCode accessing `.config`
+
+## [0.8.4] - 2026-04-18
+
+### Fixed
+- Wrapped plugin initialization in try-catch to guarantee a valid `Hooks` object is always returned, even if Redis connection or heartbeat startup fails
+- Added missing close brace for event handler in return object (syntax error from prior edit)
+
+## [0.8.3] - 2026-04-17
+
+### Fixed
+- Added required `config` hook (no-op) to plugin return — OpenCode's plugin interface requires `config` in the `Hooks` object
+
+## [0.8.2] - 2026-04-17
+
+### Fixed
+- Added `INVALID_CONTEXT` guard to `bus_release.ts` and `bus_agents.ts` — OpenCode calls tool execute functions during plugin initialization before session context is available
+
+## [0.8.1] - 2026-04-17
+
+### Fixed
+- Moved `@opencode-ai/plugin` from `devDependencies` to `dependencies` — NPM doesn't install dev/peer deps for consumers, causing runtime import failure
+
 ## [0.8.0] - 2026-04-17
 
 ### Fixed
