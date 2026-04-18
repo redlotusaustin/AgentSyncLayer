@@ -17,8 +17,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { z } from 'zod';
-
 import { hashProjectPath } from './namespace';
 
 /**
@@ -208,13 +206,34 @@ function resolveFromLocalConfig(canonicalCwd: string): BusConfig | null {
   }
 }
 
-/** Zod schema for .agentsynclayer.json config file */
-const ConfigFileSchema = z
-  .object({
-    bus: z.string().optional(),
-    db: z.string().optional(),
-  })
-  .strict();
+/**
+ * Validate and parse a .agentsynclayer.json config file object.
+ *
+ * Only allows 'bus' and 'db' keys (strict mode). Both must be strings if present.
+ *
+ * @param raw - Parsed JSON value from the config file
+ * @returns Validated config object
+ * @throws Error if validation fails
+ */
+function validateConfigFile(raw: unknown): AgentSyncLayerConfigFile {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error('Config must be a JSON object');
+  }
+  const obj = raw as Record<string, unknown>;
+  const allowedKeys = new Set(['bus', 'db']);
+  for (const key of Object.keys(obj)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`Unknown key: ${key}`);
+    }
+    if (obj[key] !== undefined && typeof obj[key] !== 'string') {
+      throw new Error(`Key "${key}" must be a string`);
+    }
+  }
+  return {
+    bus: typeof obj.bus === 'string' ? obj.bus : undefined,
+    db: typeof obj.db === 'string' ? obj.db : undefined,
+  };
+}
 
 /**
  * Parse a .agentsynclayer.json config file.
@@ -229,21 +248,17 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
   let raw: AgentSyncLayerConfigFile;
   try {
     const fileContent = fs.readFileSync(configPath, 'utf-8');
-    raw = ConfigFileSchema.parse(JSON.parse(fileContent));
+    raw = validateConfigFile(JSON.parse(fileContent));
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.warn(
-        '[AgentSyncLayer] Invalid config file (unknown keys):',
-        configPath,
-        error.issues.map((e) => e.message).join(', '),
-      );
-    } else {
-      console.warn(
-        '[AgentSyncLayer] Failed to read/parse config file:',
-        configPath,
-        error instanceof Error ? error.message : String(error),
-      );
+    // ENOENT is the normal case (no config file) — skip logging
+    if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new Error('Failed to parse config');
     }
+    console.warn(
+      '[AgentSyncLayer] Invalid config file:',
+      configPath,
+      error instanceof Error ? error.message : String(error),
+    );
     throw new Error('Failed to parse config');
   }
 
