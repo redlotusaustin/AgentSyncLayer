@@ -117,7 +117,9 @@ export async function busSendExecute(
     if (sqlite) {
       try {
         sqlite.insertMessage(messageObj);
-        sqliteWriteSucceeded = true;
+        // insertMessage catches errors internally and marks client unavailable.
+        // Check availability to detect silent write failures.
+        sqliteWriteSucceeded = sqlite.available;
       } catch (error) {
         console.warn('[bus_send] SQLite write failed, continuing with Redis only:', error);
       }
