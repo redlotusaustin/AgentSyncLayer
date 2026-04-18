@@ -12,7 +12,13 @@
  * - Handles session cleanup on idle/end events
  */
 
-import { type Plugin, type PluginInput, type ToolContext, tool } from '@opencode-ai/plugin';
+import {
+  type Hooks,
+  type Plugin,
+  type PluginInput,
+  type ToolContext,
+  tool,
+} from '@opencode-ai/plugin';
 
 const z = tool.schema;
 
@@ -342,157 +348,165 @@ const state: PluginState = {
 // ============================================================================
 
 export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
-  const { directory } = input;
-  const redis = getRedisClient();
-  const busConfig = resolveBusConfig(directory);
-  const projectHash = busConfig.projectHash;
-  const dbDir = busConfig.db_dir;
-  const agentId = getSessionAgentId(); // Same ID as tools use!
-
-  // Wait for Redis connection (max 5 seconds)
   try {
-    await redis.waitForConnection(5000);
-    state.connected = true;
-  } catch {
-    console.warn('[AgentSyncLayer] Redis connection timeout, continuing anyway');
-    state.connected = false;
-  }
+    const { directory } = input;
+    const redis = getRedisClient();
+    const busConfig = resolveBusConfig(directory);
+    const projectHash = busConfig.projectHash;
+    const dbDir = busConfig.db_dir;
+    const agentId = getSessionAgentId(); // Same ID as tools use!
 
-  // Create and start heartbeat using HeartbeatManager
-  // This uses the SAME agent ID as tools (via getSessionAgentId)
-  const heartbeatManager = new HeartbeatManager({
-    agentId,
-    projectHash,
-    task: 'AgentSyncLayer active',
-    files: [],
-    claimedFiles: [],
-    channels: ['general'],
-    startedAt: new Date().toISOString(),
-  });
+    // Wait for Redis connection (max 5 seconds)
+    try {
+      await redis.waitForConnection(5000);
+      state.connected = true;
+    } catch {
+      console.warn('[AgentSyncLayer] Redis connection timeout, continuing anyway');
+      state.connected = false;
+    }
 
-  try {
-    await heartbeatManager.start();
-    state.heartbeatManager = heartbeatManager;
-  } catch (error) {
-    console.warn('[AgentSyncLayer] Failed to start heartbeat:', error);
-  }
+    // Create and start heartbeat using HeartbeatManager
+    // This uses the SAME agent ID as tools (via getSessionAgentId)
+    const heartbeatManager = new HeartbeatManager({
+      agentId,
+      projectHash,
+      task: 'AgentSyncLayer active',
+      files: [],
+      claimedFiles: [],
+      channels: ['general'],
+      startedAt: new Date().toISOString(),
+    });
 
-  state.projectHash = projectHash;
-  state.dbDir = dbDir;
-  state.directory = directory;
+    try {
+      await heartbeatManager.start();
+      state.heartbeatManager = heartbeatManager;
+    } catch (error) {
+      console.warn('[AgentSyncLayer] Failed to start heartbeat:', error);
+    }
 
-  // Initialize SQLite client (optional, graceful degradation)
-  const sqlite = getSqliteClient(dbDir, projectHash);
-  if (!sqlite) {
-    console.warn('[AgentSyncLayer] SQLite not available, running in Redis-only mode');
-  }
+    state.projectHash = projectHash;
+    state.dbDir = dbDir;
+    state.directory = directory;
 
-  return {
-    tool: {
-      bus_send,
-      bus_read,
-      bus_channels,
-      bus_status,
-      bus_agents,
-      bus_info,
-      bus_claim,
-      bus_release,
-      bus_listen,
-      bus_history,
-      bus_search,
-    },
+    // Initialize SQLite client (optional, graceful degradation)
+    const sqlite = getSqliteClient(dbDir, projectHash);
+    if (!sqlite) {
+      console.warn('[AgentSyncLayer] SQLite not available, running in Redis-only mode');
+    }
 
-    // Config hook - required by OpenCode plugin interface
-    config: async () => {},
+    return {
+      tool: {
+        bus_send,
+        bus_read,
+        bus_channels,
+        bus_status,
+        bus_agents,
+        bus_info,
+        bus_claim,
+        bus_release,
+        bus_listen,
+        bus_history,
+        bus_search,
+      },
 
-    // Session compaction hook - inject coordination context
-    'experimental.session.compacting': async (_input, output) => {
-      if (!state.connected || !state.projectHash) {
-        return;
-      }
+      // Config hook - required by OpenCode plugin interface
+      config: async () => {},
 
-      const agentId = getSessionAgentId();
-
-      // Fetch coordination data in parallel using lifecycle helpers
-      const [agents, myClaims, recentMessages] = await Promise.all([
-        getActiveAgents(state.projectHash),
-        getMyClaims(state.projectHash, agentId),
-        getRecentMessages(state.projectHash, ['general', 'claims'], 5, agentId),
-      ]);
-
-      const contextText = formatCompactionContext(agents, myClaims, recentMessages);
-      output.context.push(contextText);
-    },
-
-    // System transform hook - inject bus instructions + unread notifications
-    'experimental.chat.system.transform': async (_input, output) => {
-      // Always inject bus usage instructions on every turn
-      output.system.push(...BUS_INSTRUCTIONS);
-
-      // Inject unread message notifications (requires SQLite)
-      if (!state.projectHash || !state.dbDir) {
-        return;
-      }
-
-      const agentId = getSessionAgentId();
-      const sqlite = getSqliteClient(state.dbDir, state.projectHash);
-      if (!sqlite) {
-        return;
-      }
-
-      const lastSeen = await getLastSeenTimestamp(state.projectHash, agentId);
-      const unread = sqlite.getMessagesSince({
-        projectHash: state.projectHash,
-        sinceUnixMs: lastSeen,
-        limit: 50,
-      });
-
-      if (unread.length === 0) {
-        return;
-      }
-
-      // Build notification lines using shared function
-      const lines = buildNotificationText(unread);
-      if (!lines) {
-        return;
-      }
-
-      // Append notification lines to system array
-      output.system.push(...lines);
-    },
-
-    // Event handler for cleanup
-    event: async (payload) => {
-      const { event } = payload;
-
-      // Handle session cleanup events
-      // Note: "session.idle" and "session.deleted" are the actual session events in OpenCode SDK
-      if (event.type === 'session.idle' || event.type === 'session.deleted') {
-        // Stop heartbeat
-        if (state.heartbeatManager) {
-          state.heartbeatManager.stop();
-          state.heartbeatManager = null;
+      // Session compaction hook - inject coordination context
+      'experimental.session.compacting': async (_input, output) => {
+        if (!state.connected || !state.projectHash) {
+          return;
         }
 
-        // Clean up agent resources using lifecycle helper
-        if (state.connected && state.projectHash) {
-          const agentId = getSessionAgentId();
-          await cleanupAgent(state.projectHash, agentId);
+        const agentId = getSessionAgentId();
+
+        // Fetch coordination data in parallel using lifecycle helpers
+        const [agents, myClaims, recentMessages] = await Promise.all([
+          getActiveAgents(state.projectHash),
+          getMyClaims(state.projectHash, agentId),
+          getRecentMessages(state.projectHash, ['general', 'claims'], 5, agentId),
+        ]);
+
+        const contextText = formatCompactionContext(agents, myClaims, recentMessages);
+        output.context.push(contextText);
+      },
+
+      // System transform hook - inject bus instructions + unread notifications
+      'experimental.chat.system.transform': async (_input, output) => {
+        // Always inject bus usage instructions on every turn
+        output.system.push(...BUS_INSTRUCTIONS);
+
+        // Inject unread message notifications (requires SQLite)
+        if (!state.projectHash || !state.dbDir) {
+          return;
         }
 
-        // Clean up rate limiter
-        cleanupRateLimiter();
-
-        // Close SQLite connection
-        if (state.dbDir) {
-          closeSqliteClient(state.dbDir);
-          state.dbDir = null;
+        const agentId = getSessionAgentId();
+        const sqlite = getSqliteClient(state.dbDir, state.projectHash);
+        if (!sqlite) {
+          return;
         }
 
-        state.connected = false;
-      }
-    },
-  };
+        const lastSeen = await getLastSeenTimestamp(state.projectHash, agentId);
+        const unread = sqlite.getMessagesSince({
+          projectHash: state.projectHash,
+          sinceUnixMs: lastSeen,
+          limit: 50,
+        });
+
+        if (unread.length === 0) {
+          return;
+        }
+
+        // Build notification lines using shared function
+        const lines = buildNotificationText(unread);
+        if (!lines) {
+          return;
+        }
+
+        // Append notification lines to system array
+        output.system.push(...lines);
+      },
+
+      // Event handler for cleanup
+      event: async (payload) => {
+        const { event } = payload;
+
+        // Handle session cleanup events
+        // Note: "session.idle" and "session.deleted" are the actual session events in OpenCode SDK
+        if (event.type === 'session.idle' || event.type === 'session.deleted') {
+          // Stop heartbeat
+          if (state.heartbeatManager) {
+            state.heartbeatManager.stop();
+            state.heartbeatManager = null;
+          }
+
+          // Clean up agent resources using lifecycle helper
+          if (state.connected && state.projectHash) {
+            const agentId = getSessionAgentId();
+            await cleanupAgent(state.projectHash, agentId);
+          }
+
+          // Clean up rate limiter
+          cleanupRateLimiter();
+
+          // Close SQLite connection
+          if (state.dbDir) {
+            closeSqliteClient(state.dbDir);
+            state.dbDir = null;
+          }
+
+          state.connected = false;
+        }
+      },
+    };
+  } catch (initError) {
+    console.warn(
+      '[AgentSyncLayer] Plugin initialization failed, returning minimal hooks:',
+      initError,
+    );
+    return { tool: {}, config: async () => {}, event: async () => {} } as Hooks;
+  }
 };
 
 // Export as default for convenience
