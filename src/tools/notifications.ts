@@ -61,7 +61,11 @@ export async function getLastSeenTimestamp(projectHash: string, agentId: string)
   const client = redis.getClient();
   const value = await client.get(key);
 
-  return value ? parseInt(value, 10) : 0;
+  if (value === null) {
+    return 0;
+  }
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 /**

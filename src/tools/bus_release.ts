@@ -73,21 +73,21 @@ export async function busReleaseExecute(
 ): Promise<ToolResponse<ReleaseResponseData>> {
   const redis = getRedisClient();
 
+  // Guard against missing or malformed context (defense-in-depth)
+  if (!context || typeof context.directory !== 'string') {
+    return {
+      ok: false,
+      error: 'Context directory is required',
+      code: 'INVALID_CONTEXT',
+    };
+  }
+
   // Check Redis connection
   if (!redis.checkConnection()) {
     return {
       ok: false,
       error: 'Bus unavailable: Redis connection not established',
       code: 'BUS_UNAVAILABLE',
-    };
-  }
-
-  // Guard against missing or malformed context (defense-in-depth)
-  if (!context || typeof context.directory !== 'string') {
-    return {
-      ok: false,
-      error: 'Tool context is missing or malformed',
-      code: 'INVALID_CONTEXT',
     };
   }
 

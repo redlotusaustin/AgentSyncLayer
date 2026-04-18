@@ -74,6 +74,8 @@ export class RedisClient {
   private _state: ConnectionState = 'disconnected';
   private connectionPromise: Promise<void> | null = null;
   private _retryCount = 0;
+  /** Map of channel -> message handler for cleanup on unsubscribe */
+  private messageHandlers = new Map<string, (ch: string, msg: string) => void>();
 
   /**
    * Create a new Redis client wrapper
@@ -281,12 +283,36 @@ export class RedisClient {
     if (!this.checkConnection()) {
       throw new RedisConnectionError('Cannot subscribe: Redis is not connected');
     }
-    this.client.subscribe(channel);
-    this.client.on('message', (ch: string, msg: string) => {
+
+    // Clean up existing subscription for this channel to prevent listener leak
+    if (this.messageHandlers.has(channel)) {
+      this.unsubscribe(channel);
+    }
+
+    // Create named handler so we can remove it later
+    const handler = (ch: string, msg: string) => {
       if (ch === channel) {
         callback(msg);
       }
-    });
+    };
+
+    this.messageHandlers.set(channel, handler);
+    this.client.on('message', handler);
+    await this.client.subscribe(channel);
+  }
+
+  /**
+   * Unsubscribe from a Redis pub/sub channel and remove the message listener.
+   *
+   * @param channel - The channel name to unsubscribe from
+   */
+  async unsubscribe(channel: string): Promise<void> {
+    const handler = this.messageHandlers.get(channel);
+    if (handler) {
+      this.client.off('message', handler);
+      this.messageHandlers.delete(channel);
+    }
+    await this.client.unsubscribe(channel);
   }
 
   /**
@@ -309,6 +335,11 @@ export class RedisClient {
   async close(): Promise<void> {
     this._connected = false;
     this._state = 'disconnected';
+    // Clean up all message handlers to prevent leaks
+    for (const [_channel, handler] of this.messageHandlers) {
+      this.client.off('message', handler);
+    }
+    this.messageHandlers.clear();
     await this.client.quit();
   }
 
@@ -320,12 +351,20 @@ export class RedisClient {
   forceClose(): void {
     this._connected = false;
     this._state = 'disconnected';
+    for (const [_channel, handler] of this.messageHandlers) {
+      this.client.off('message', handler);
+    }
+    this.messageHandlers.clear();
     this.client.disconnect();
   }
 }
 
 /**
  * Default Redis client instance
+ *
+ * Note: Redis client is a module-level singleton that persists across sessions.
+ * This is intentional — reconnecting on every session would add unnecessary latency.
+ * The client handles reconnection internally via ioredis.
  *
  * Created lazily on first access. Can be overridden by setting
  * a new instance directly.

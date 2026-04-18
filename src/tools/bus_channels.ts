@@ -23,21 +23,21 @@ export async function busChannelsExecute(
 ): Promise<ToolResponse<ChannelsResponseData>> {
   const redis = getRedisClient();
 
-  // Check Redis connection
-  if (!redis.checkConnection()) {
-    return {
-      ok: false,
-      error: 'Bus unavailable: Redis connection not established',
-      code: 'BUS_UNAVAILABLE',
-    };
-  }
-
   // Guard against missing context
   if (!context?.directory) {
     return {
       ok: false,
       error: 'Context directory is required',
       code: 'INVALID_CONTEXT',
+    };
+  }
+
+  // Check Redis connection
+  if (!redis.checkConnection()) {
+    return {
+      ok: false,
+      error: 'Bus unavailable: Redis connection not established',
+      code: 'BUS_UNAVAILABLE',
     };
   }
 

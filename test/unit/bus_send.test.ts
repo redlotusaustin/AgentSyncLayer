@@ -307,7 +307,8 @@ describe('bus_send unit tests', () => {
 
     test('returns RATE_LIMITED when rate limit exceeded', async () => {
       // Set up many messages to trigger rate limiting
-      const agentId = `test-agent-${Date.now()}`;
+      // Valid agent ID format: hostname-pid-random4hex
+      const agentId = `test-agent-${Date.now()}-abcd`;
       setSessionAgentId(agentId);
 
       // Send 101 messages to trigger rate limit (default: 100/minute)

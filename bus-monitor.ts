@@ -209,7 +209,6 @@ const cyan = (s: string) => `${C.cyan}${s}${C.reset}`;
 const green = (s: string) => `${C.green}${s}${C.reset}`;
 const yellow = (s: string) => `${C.yellow}${s}${C.reset}`;
 const red = (s: string) => `${C.red}${s}${C.reset}`;
-const _magenta = (s: string) => `${C.magenta}${s}${C.reset}`;
 
 function getAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -290,13 +289,6 @@ async function collectSnapshot(
       const db = new Database(paths.dbPath, { readonly: true });
       data.sqlite.available = true;
       data.sqlite.dbSizeBytes = fs.statSync(paths.dbPath).size;
-
-      const _filter =
-        args.channel.size > 0
-          ? `WHERE name IN (${Array.from(args.channel)
-              .map(() => '?')
-              .join(',')})`
-          : '';
 
       data.sqlite.messageCount =
         args.channel.size > 0

@@ -24,10 +24,37 @@
  * }
  */
 
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Message, MessageType } from './types';
+
+/**
+ * Cached bun:sqlite module — null = not yet attempted, undefined = unavailable.
+ * Using null sentinel allows distinguishing "not tried" from "tried and failed".
+ */
+let _bunSqliteModule: typeof import('bun:sqlite') | null | undefined = null;
+
+/**
+ * Attempt to load bun:sqlite module lazily.
+ * Caches result: subsequent calls return cached value without retrying.
+ * Bun resolves `require('bun:sqlite')`, other runtimes throw.
+ * @returns bun:sqlite module if available, undefined otherwise
+ */
+function loadBunSqlite(): typeof import('bun:sqlite') | undefined {
+  if (_bunSqliteModule !== null) {
+    return _bunSqliteModule ?? undefined;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('bun:sqlite') as typeof import('bun:sqlite');
+    _bunSqliteModule = mod;
+    return mod;
+  } catch {
+    _bunSqliteModule = undefined;
+    return undefined;
+  }
+}
 
 /** Row shape returned by SQLite message queries */
 interface MessageRow {
@@ -124,8 +151,15 @@ export class SqliteClient {
 
     this.dbPath = path.join(dbDir, 'history.db');
 
+    // Attempt to load bun:sqlite lazily
+    const bunSqlite = loadBunSqlite();
+    if (!bunSqlite) {
+      this._available = false;
+      throw new SqliteInitializationError('bun:sqlite is not available in this runtime');
+    }
+
     try {
-      this.db = new Database(this.dbPath);
+      this.db = new bunSqlite.Database(this.dbPath);
       this.db.exec('PRAGMA journal_mode = WAL');
       this.db.exec('PRAGMA foreign_keys = ON');
       this.initializeSchema();
@@ -336,21 +370,26 @@ export class SqliteClient {
    * @param msg - The message to insert
    */
   insertMessage(msg: Message): void {
-    const createdAt = new Date(msg.timestamp).getTime();
-    const result = this.stmtInsertMessage.run(
-      msg.id,
-      msg.channel,
-      msg.from,
-      msg.type,
-      JSON.stringify(msg.payload),
-      msg.timestamp,
-      msg.project,
-      createdAt,
-    );
-    // Only update channel count if this is a new message (not a duplicate)
-    // FTS5 is updated automatically via AFTER INSERT trigger
-    if (result.changes > 0) {
-      this.stmtUpsertChannel.run(msg.channel, msg.project, createdAt);
+    try {
+      const createdAt = new Date(msg.timestamp).getTime();
+      const result = this.stmtInsertMessage.run(
+        msg.id,
+        msg.channel,
+        msg.from,
+        msg.type,
+        JSON.stringify(msg.payload),
+        msg.timestamp,
+        msg.project,
+        createdAt,
+      );
+      // Only update channel count if this is a new message (not a duplicate)
+      // FTS5 is updated automatically via AFTER INSERT trigger
+      if (result.changes > 0) {
+        this.stmtUpsertChannel.run(msg.channel, msg.project, createdAt);
+      }
+    } catch (error) {
+      this._available = false;
+      console.warn('[AgentSyncLayer] SQLite write failed, client marked unavailable:', error);
     }
   }
 
@@ -480,12 +519,19 @@ export class SqliteClient {
  * @returns Parsed Message object
  */
 function rowToMessage(row: MessageRow): Message {
+  let payload: Message['payload'];
+  try {
+    payload = JSON.parse(row.payload);
+  } catch {
+    console.warn(`[AgentSyncLayer] Corrupted payload in message ${row.id}, using degraded payload`);
+    payload = { text: '[message data corrupted]' };
+  }
   return {
     id: row.id,
     from: row.from,
     channel: row.channel,
     type: row.type as MessageType,
-    payload: JSON.parse(row.payload),
+    payload,
     timestamp: row.timestamp,
     project: row.project,
   };
@@ -549,7 +595,14 @@ const clientMap = new Map<string, SqliteClient>();
  */
 export function getSqliteClient(directory: string, projectHash: string): SqliteClient | null {
   const cached = clientMap.get(directory);
-  if (cached) return cached;
+  if (cached) {
+    // If cached client is no longer available, evict and re-attempt
+    if (!cached.available) {
+      clientMap.delete(directory);
+    } else {
+      return cached;
+    }
+  }
 
   try {
     const client = new SqliteClient(directory, projectHash);

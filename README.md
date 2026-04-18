@@ -2,7 +2,7 @@
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.6.0
+Version 0.8.6
 
 ---
 
@@ -472,14 +472,23 @@ All tools return JSON with a consistent envelope:
 | Code | Meaning | Recovery |
 |------|---------|----------|
 | `BUS_UNAVAILABLE` | Both Redis and SQLite are unavailable | Wait and retry; check Redis is running |
-| `SQLITE_UNAVAILABLE` | SQLite history/search not available | Continue without history; bus_send/read still work via Redis |
 | `CHANNEL_INVALID` | Channel name fails validation | Fix channel name (1-64 alphanumeric/hyphen/underscore) |
+| `INVALID_CONTEXT` | Tool called without required context | Ensure directory context is provided |
 | `CLAIM_CONFLICT` | File already claimed | Wait for expiry, negotiate, or proceed anyway |
 | `CLAIM_NOT_FOUND` | No claim exists | No action needed |
+| `CLAIM_NOT_OWNER` | Attempting to release a claim you don't own | Check agent status |
 | `PATH_INVALID` | File path fails validation | Fix path (relative, no `..`, no leading `/`) |
-| `RATE_LIMITED` | Too many messages per second | Wait before sending more |
 | `QUERY_INVALID` | Search query is empty | Provide a non-empty search term |
+| `RATE_LIMITED` | Too many messages per second | Wait before sending more |
 | `INTERNAL_ERROR` | Unexpected error | Check logs; may indicate Redis/SQLite issue |
+| `SQLITE_UNAVAILABLE` | SQLite history/search not available | Continue without history; bus_send/read still work via Redis |
+| `MESSAGE_EMPTY` | Message text is empty | Provide non-empty message |
+| `MESSAGE_TOO_LONG` | Message exceeds 4096 characters | Shorten message |
+| `TYPE_INVALID` | Invalid message type | Use one of: info, status, error, coordination, claim, release |
+| `TIMEOUT_INVALID` | Invalid timeout value | Use integer between 1 and 30 seconds |
+| `LIMIT_INVALID` | Invalid limit value | Use integer between 1 and 100 |
+| `TASK_EMPTY` | Task description is empty | Provide non-empty task description |
+| `TASK_TOO_LONG` | Task description exceeds 256 characters | Shorten task description |
 
 ### Tool Schemas
 
@@ -689,7 +698,7 @@ Use bus_read to view details.
 
 ### Cleanup on Session End
 
-When `session.idle` or `session.end` fires:
+When `session.idle` or `session.deleted` fires:
 1. Stop heartbeat timer
 2. Delete agent status key
 3. Release all held claims
@@ -880,9 +889,16 @@ MIT
 
 ---
 
-## Related Documents
+## Installation
 
-- [PRD](./PRD.md) — Product Requirements Document
-- [RFC](./RFC.md) — Architecture and design decisions
-- [Contract](./contract.md) — Tool interfaces, schemas, and key formats
-- [Tests](./tests.md) — Test scenarios
+```bash
+npm install opencode-asl
+```
+
+Then add to your OpenCode config (`~/.config/opencode/opencode.json` or project `opencode.json`):
+
+```json
+{
+  "plugin": ["opencode-asl"]
+}
+```

@@ -5,6 +5,44 @@ All notable changes to AgentSyncLayer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.6] - 2026-04-18
+
+### Security
+- Guard `bun:sqlite` import with dynamic loading — plugin no longer crashes outside Bun runtime (H1)
+- Validate `bus_status` args.files/args.channels before Redis storage — prevents prompt injection via compaction hook (H4)
+- Add try-catch to all three OpenCode hooks (compaction, system transform, event) — prevents Redis/SQLite errors from propagating (H5)
+
+### Bug Fixes
+- Fix Redis `subscribe()` listener leak — added unsubscribe handler cleanup (H2)
+- Fix corrupted SQLite client staying in singleton map forever — evict and re-attempt on write failure (H3)
+- Fix `rowToMessage()` JSON.parse crash on corrupted payload data (M9)
+- Fix `bus_agents` returning wrong error code for invalid context (M5)
+- Fix `bus_release` using non-standard error message for invalid context (M6)
+- Fix config file permission errors silently swallowed (M8)
+- Fix `parseInt` NaN fallback in notifications timestamp (L3)
+- Fix `validateFilePath` returning empty string instead of throwing for non-string input (L1)
+
+### Improvements
+- Standardize Redis/context check ordering across all 11 tools — context first (M7)
+- Add agent ID validation in rate limiter (M10)
+- Derive `validateMessageType` valid types from `MessageType` union instead of hardcoded array (L2)
+- Add `bus_info` to BUS_INSTRUCTIONS in system prompt (L5)
+- Document rate limiter and Redis client limitations (L7, L8)
+
+### Documentation
+- Update README version from 0.6.0 to 0.8.6 (M1)
+- Remove broken doc links (M2)
+- Add consumer-facing install instructions (M3)
+- Fix `session.end` → `session.deleted` in README (M4)
+- Update error codes table to include all 18 codes (L6)
+
+### Cleanup
+- Delete stale `opencode-asl-0.6.3.tgz` from repo (M11)
+- Delete stale `package/` directory from v0.6.0 (M12)
+- Add `*.tgz` and `package/` to `.gitignore` (M11)
+- Update package description to reflect Redis + SQLite (M13)
+- Remove dead code: `_filter`, `_magenta`, `buildKey`, `KeyBuilder`, `createKeyBuilder`, `ValidationError`, `ClaimConflictError` (L4)
+
 ## [0.8.5] - 2026-04-18
 
 ### Fixed

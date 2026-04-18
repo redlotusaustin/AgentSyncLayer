@@ -9,6 +9,7 @@ import { resolveProjectHash } from '../config';
 import { getRedisClient } from '../redis';
 import { getSessionAgentId } from '../session';
 import type { AgentStatus, StatusResponseData, ToolContext, ToolResponse } from '../types';
+import { validateChannel, validateFilePath } from '../validation';
 
 /**
  * Tool arguments for bus_status
@@ -37,21 +38,21 @@ export async function busStatusExecute(
 ): Promise<ToolResponse<StatusResponseData>> {
   const redis = getRedisClient();
 
-  // Check Redis connection
-  if (!redis.checkConnection()) {
-    return {
-      ok: false,
-      error: 'Bus unavailable: Redis connection not established',
-      code: 'BUS_UNAVAILABLE',
-    };
-  }
-
   // Guard against missing context
   if (!context?.directory) {
     return {
       ok: false,
       error: 'Context directory is required',
       code: 'INVALID_CONTEXT',
+    };
+  }
+
+  // Check Redis connection
+  if (!redis.checkConnection()) {
+    return {
+      ok: false,
+      error: 'Bus unavailable: Redis connection not established',
+      code: 'BUS_UNAVAILABLE',
     };
   }
 
@@ -73,6 +74,60 @@ export async function busStatusExecute(
       };
     }
 
+    // Validate files array (max 50 elements, each must be a valid relative path)
+    const files: string[] = [];
+    if (args.files && Array.isArray(args.files)) {
+      if (args.files.length > 50) {
+        return {
+          ok: false,
+          error: 'Too many files: max 50 allowed',
+          code: 'PATH_INVALID' as const,
+        };
+      }
+      for (const file of args.files) {
+        try {
+          const validated = validateFilePath(file);
+          if (validated.length > 256) {
+            return {
+              ok: false,
+              error: 'File path too long: max 256 characters',
+              code: 'PATH_INVALID' as const,
+            };
+          }
+          files.push(validated);
+        } catch {
+          return {
+            ok: false,
+            error: `Invalid file path: ${String(file)}`,
+            code: 'PATH_INVALID' as const,
+          };
+        }
+      }
+    }
+
+    // Validate channels array (max 50 elements, each must be a valid channel name)
+    const channels: string[] = [];
+    if (args.channels && Array.isArray(args.channels)) {
+      if (args.channels.length > 50) {
+        return {
+          ok: false,
+          error: 'Too many channels: max 50 allowed',
+          code: 'CHANNEL_INVALID' as const,
+        };
+      }
+      for (const ch of args.channels) {
+        try {
+          channels.push(validateChannel(ch));
+        } catch {
+          return {
+            ok: false,
+            error: `Invalid channel name: ${String(ch)}`,
+            code: 'CHANNEL_INVALID' as const,
+          };
+        }
+      }
+    }
+
     // Use session agent ID
     const agentId = getSessionAgentId();
     const now = new Date();
@@ -82,9 +137,9 @@ export async function busStatusExecute(
     const status: AgentStatus = {
       id: agentId,
       task,
-      files: args.files ?? [],
+      files,
       claimedFiles: [],
-      channels: args.channels ?? ['general'],
+      channels: channels.length > 0 ? channels : ['general'],
       startedAt: now.toISOString(),
       lastHeartbeat: now.toISOString(),
     };
