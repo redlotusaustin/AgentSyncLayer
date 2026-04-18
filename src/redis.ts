@@ -73,7 +73,7 @@ export class RedisClient {
   private _connected = false;
   private _state: ConnectionState = 'disconnected';
   private connectionPromise: Promise<void> | null = null;
-  private retryCount = 0;
+  private _retryCount = 0;
 
   /**
    * Create a new Redis client wrapper
@@ -124,7 +124,7 @@ export class RedisClient {
     this.client.on('ready', () => {
       this._connected = true;
       this._state = 'connected';
-      this.retryCount = 0;
+      this._retryCount = 0;
     });
 
     // Connection error
@@ -145,7 +145,7 @@ export class RedisClient {
     // Attempting to reconnect
     this.client.on('reconnecting', () => {
       this._state = 'reconnecting';
-      this.retryCount++;
+      this._retryCount++;
     });
   }
 
@@ -208,6 +208,15 @@ export class RedisClient {
    */
   get connected(): boolean {
     return this._connected;
+  }
+
+  /**
+   * Get current retry attempt count
+   *
+   * @returns Number of consecutive reconnection attempts
+   */
+  get retryCount(): number {
+    return this._retryCount;
   }
 
   /**

@@ -17,11 +17,12 @@ import { busHistoryExecute } from './src/tools/bus_history';
 import { busReadExecute } from './src/tools/bus_read';
 import { busSearchExecute } from './src/tools/bus_search';
 import { busSendExecute } from './src/tools/bus_send';
+import type { ToolContext } from './src/types';
 
 const projectHash = hashProjectPath(projectDir);
 console.log(`Project hash: ${projectHash}`);
 
-const ctx = { directory: projectDir } as any;
+const ctx = { directory: projectDir } as ToolContext;
 
 // --- Phase 1: Initialize SQLite ---
 console.log('\n=== Phase 1: Initialize SQLite ===');
@@ -60,8 +61,8 @@ console.log(
   `Read 'general': ok=${readResult.ok}, count=${readResult.data?.count}, total=${readResult.data?.total}`,
 );
 if (readResult.ok) {
-  for (const msg of (readResult.data as any).messages) {
-    console.log(`  [${msg.type}] ${msg.from}: ${(msg.payload as any).text}`);
+  for (const msg of (readResult.data as { messages: unknown[] }).messages) {
+    console.log(`  [${msg.type}] ${msg.from}: ${(msg.payload as { text?: string }).text}`);
   }
 }
 
@@ -69,29 +70,29 @@ if (readResult.ok) {
 console.log('\n=== Phase 4: bus_history (paginated from SQLite) ===');
 const historyResult = await busHistoryExecute({ channel: 'general', page: 1, per_page: 10 }, ctx);
 console.log(
-  `History 'general' p1: ok=${historyResult.ok}, count=${(historyResult.data as any)?.count}, total=${(historyResult.data as any)?.total}, pages=${(historyResult.data as any)?.total_pages}`,
+  `History 'general' p1: ok=${historyResult.ok}, count=${(historyResult.data as { count?: number })?.count}, total=${(historyResult.data as { total?: number })?.total}, pages=${(historyResult.data as { total?: number })?.total_pages}`,
 );
 
 const allHistory = await busHistoryExecute({ page: 1, per_page: 10 }, ctx);
 console.log(
-  `History (all channels): ok=${allHistory.ok}, count=${(allHistory.data as any)?.count}, total=${(allHistory.data as any)?.total}`,
+  `History (all channels): ok=${allHistory.ok}, count=${(allHistory.data as { count?: number })?.count}, total=${(allHistory.data as { total?: number })?.total}`,
 );
 
 // --- Phase 5: bus_search (FTS5) ---
 console.log('\n=== Phase 5: bus_search (FTS5 full-text) ===');
 const searchResult = await busSearchExecute({ query: 'SQLite persistence' }, ctx);
 console.log(
-  `Search 'SQLite persistence': ok=${searchResult.ok}, count=${(searchResult.data as any)?.count}`,
+  `Search 'SQLite persistence': ok=${searchResult.ok}, count=${(searchResult.data as { count?: number })?.count}`,
 );
 if (searchResult.ok) {
-  for (const r of (searchResult.data as any).results) {
+  for (const r of (searchResult.data as { results: unknown[] }).results) {
     console.log(`  [rank=${r.rank}] ${r.message.channel}: ${r.snippet}`);
   }
 }
 
 const searchResult2 = await busSearchExecute({ query: 'build', channel: 'build' }, ctx);
 console.log(
-  `Search 'build' in 'build': ok=${searchResult2.ok}, count=${(searchResult2.data as any)?.count}`,
+  `Search 'build' in 'build': ok=${searchResult2.ok}, count=${(searchResult2.data as { count?: number })?.count}`,
 );
 
 // --- Phase 6: Fallback test (flush Redis, read from SQLite) ---

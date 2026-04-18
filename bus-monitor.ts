@@ -23,6 +23,26 @@ import { hashProjectPath } from './src/namespace';
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
+/** Shape of SQLite COUNT(*) query results */
+interface CountRow {
+  n: number;
+}
+
+/** Shape of SQLite channel listing query results */
+interface ChannelRow {
+  name: string;
+  message_count: number;
+}
+
+/** Shape of recent message query results */
+interface RecentMessageRow {
+  channel: string;
+  from: string;
+  type: string;
+  payload: string;
+  timestamp: string;
+}
+
 interface CliArgs {
   project: string | null;
   db: string | null;
@@ -287,12 +307,16 @@ async function collectSnapshot(
                     .map(() => '?')
                     .join(',')})`,
                 )
-                .get(...Array.from(args.channel)) as any
+                .get(...Array.from(args.channel)) as CountRow
             ).n
-          : (db.prepare('SELECT COUNT(*) as n FROM messages').get() as any).n;
+          : (db.prepare('SELECT COUNT(*) as n FROM messages').get() as CountRow).n;
 
-      data.sqlite.channelCount = (db.prepare('SELECT COUNT(*) as n FROM channels').get() as any).n;
-      data.sqlite.ftsCount = (db.prepare('SELECT COUNT(*) as n FROM messages_fts').get() as any).n;
+      data.sqlite.channelCount = (
+        db.prepare('SELECT COUNT(*) as n FROM channels').get() as CountRow
+      ).n;
+      data.sqlite.ftsCount = (
+        db.prepare('SELECT COUNT(*) as n FROM messages_fts').get() as CountRow
+      ).n;
 
       data.sqlite.channels =
         args.channel.size > 0
@@ -302,10 +326,10 @@ async function collectSnapshot(
                   .map(() => '?')
                   .join(',')}) ORDER BY message_count DESC`,
               )
-              .all(...Array.from(args.channel)) as any[])
+              .all(...Array.from(args.channel)) as ChannelRow[])
           : (db
               .prepare('SELECT name, message_count FROM channels ORDER BY message_count DESC')
-              .all() as any[]);
+              .all() as ChannelRow[]);
 
       const recentQuery =
         args.channel.size > 0
@@ -318,10 +342,10 @@ async function collectSnapshot(
 
       const recentRows =
         args.channel.size > 0
-          ? (db.prepare(recentQuery).all(...Array.from(args.channel)) as any[])
-          : (db.prepare(recentQuery).all() as any[]);
+          ? (db.prepare(recentQuery).all(...Array.from(args.channel)) as ChannelRow[])
+          : (db.prepare(recentQuery).all() as ChannelRow[]);
 
-      data.sqlite.recentMessages = recentRows.map((r: any) => ({
+      data.sqlite.recentMessages = recentRows.map((r: RecentMessageRow) => ({
         channel: r.channel,
         from: r.from,
         type: r.type,

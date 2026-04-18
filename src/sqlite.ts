@@ -27,7 +27,20 @@
 import { Database } from 'bun:sqlite';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Message } from './types';
+import type { Message, MessageType } from './types';
+
+/** Row shape returned by SQLite message queries */
+interface MessageRow {
+  id: string;
+  channel: string;
+  from: string;
+  type: string;
+  payload: string;
+  timestamp: string;
+  project: string;
+  rank: number;
+  snippet: string;
+}
 
 /**
  * Error thrown when SQLite initialization fails.
@@ -363,8 +376,8 @@ export class SqliteClient {
 
     // Use cached prepared statement
     const rows = channel
-      ? (this.stmtGetMessagesByChannel.all(projectHash, channel, limit, offset) as any[])
-      : (this.stmtGetMessagesAll.all(projectHash, limit, offset) as any[]);
+      ? (this.stmtGetMessagesByChannel.all(projectHash, channel, limit, offset) as MessageRow[])
+      : (this.stmtGetMessagesAll.all(projectHash, limit, offset) as MessageRow[]);
     const messages = rows.map(rowToMessage);
 
     // Use cached prepared statement for count
@@ -387,7 +400,11 @@ export class SqliteClient {
    */
   getMessagesSince(opts: MessagesSinceOptions): Message[] {
     const limit = opts.limit ?? 50;
-    const rows = this.stmtGetMessagesSince.all(opts.projectHash, opts.sinceUnixMs, limit) as any[];
+    const rows = this.stmtGetMessagesSince.all(
+      opts.projectHash,
+      opts.sinceUnixMs,
+      limit,
+    ) as MessageRow[];
     return rows.map(rowToMessage);
   }
 
@@ -414,8 +431,8 @@ export class SqliteClient {
 
     // Use cached prepared statement
     const rows = channel
-      ? (this.stmtSearchWithChannel.all(sanitized, projectHash, channel, limit) as any[])
-      : (this.stmtSearchAllChannels.all(sanitized, projectHash, limit) as any[]);
+      ? (this.stmtSearchWithChannel.all(sanitized, projectHash, channel, limit) as MessageRow[])
+      : (this.stmtSearchAllChannels.all(sanitized, projectHash, limit) as MessageRow[]);
 
     return rows.map((row) => ({
       message: rowToMessage(row),
@@ -462,12 +479,12 @@ export class SqliteClient {
  * @param row - Database row object with id, channel, from, type, payload, timestamp, project
  * @returns Parsed Message object
  */
-function rowToMessage(row: any): Message {
+function rowToMessage(row: MessageRow): Message {
   return {
     id: row.id,
     from: row.from,
     channel: row.channel,
-    type: row.type,
+    type: row.type as MessageType,
     payload: JSON.parse(row.payload),
     timestamp: row.timestamp,
     project: row.project,
