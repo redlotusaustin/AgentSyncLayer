@@ -96,6 +96,7 @@ export async function getActiveAgents(projectHash: string): Promise<AgentStatus[
   } while (cursor !== '0' && agentKeys.length < SCAN_MAX_KEYS);
 
   // Batch fetch all agent data in single round-trip
+  if (agentKeys.length === 0) return [];
   const agentDataList = await client.mget(agentKeys);
 
   const statuses = agentDataList.map((data) => {
@@ -147,6 +148,7 @@ export async function getMyClaims(projectHash: string, agentId: string): Promise
   const prefix = `opencode:${projectHash}:claim:`;
 
   // Batch fetch all claim data in single round-trip
+  if (claimKeys.length === 0) return [];
   const claimDataList = await client.mget(claimKeys);
 
   for (let i = 0; i < claimKeys.length; i++) {
