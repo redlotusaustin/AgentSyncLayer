@@ -402,6 +402,9 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
       bus_search,
     },
 
+    // Config hook - required by OpenCode plugin interface
+    config: async () => {},
+
     // Session compaction hook - inject coordination context
     'experimental.session.compacting': async (_input, output) => {
       if (!state.connected || !state.projectHash) {
