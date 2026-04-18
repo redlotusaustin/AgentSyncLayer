@@ -414,58 +414,66 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
 
       // Session compaction hook - inject coordination context
       'experimental.session.compacting': async (_input, output) => {
-        if (!state.connected || !state.projectHash) {
-          return;
+        try {
+          if (!state.connected || !state.projectHash) {
+            return;
+          }
+
+          const agentId = getSessionAgentId();
+
+          // Fetch coordination data in parallel using lifecycle helpers
+          const [agents, myClaims, recentMessages] = await Promise.all([
+            getActiveAgents(state.projectHash),
+            getMyClaims(state.projectHash, agentId),
+            getRecentMessages(state.projectHash, ['general', 'claims'], 5, agentId),
+          ]);
+
+          const contextText = formatCompactionContext(agents, myClaims, recentMessages);
+          output.context.push(contextText);
+        } catch (error) {
+          console.warn('[AgentSyncLayer] Compaction hook error:', error);
         }
-
-        const agentId = getSessionAgentId();
-
-        // Fetch coordination data in parallel using lifecycle helpers
-        const [agents, myClaims, recentMessages] = await Promise.all([
-          getActiveAgents(state.projectHash),
-          getMyClaims(state.projectHash, agentId),
-          getRecentMessages(state.projectHash, ['general', 'claims'], 5, agentId),
-        ]);
-
-        const contextText = formatCompactionContext(agents, myClaims, recentMessages);
-        output.context.push(contextText);
       },
 
       // System transform hook - inject bus instructions + unread notifications
       'experimental.chat.system.transform': async (_input, output) => {
-        // Always inject bus usage instructions on every turn
+        // Always inject bus usage instructions on every turn (never skip this)
         output.system.push(...BUS_INSTRUCTIONS);
 
-        // Inject unread message notifications (requires SQLite)
-        if (!state.projectHash || !state.dbDir) {
-          return;
+        // Inject unread message notifications (best-effort, degrade gracefully)
+        try {
+          if (!state.projectHash || !state.dbDir) {
+            return;
+          }
+
+          const agentId = getSessionAgentId();
+          const sqlite = getSqliteClient(state.dbDir, state.projectHash);
+          if (!sqlite) {
+            return;
+          }
+
+          const lastSeen = await getLastSeenTimestamp(state.projectHash, agentId);
+          const unread = sqlite.getMessagesSince({
+            projectHash: state.projectHash,
+            sinceUnixMs: lastSeen,
+            limit: 50,
+          });
+
+          if (unread.length === 0) {
+            return;
+          }
+
+          // Build notification lines using shared function
+          const lines = buildNotificationText(unread);
+          if (!lines) {
+            return;
+          }
+
+          // Append notification lines to system array
+          output.system.push(...lines);
+        } catch (error) {
+          console.warn('[AgentSyncLayer] System transform notification error:', error);
         }
-
-        const agentId = getSessionAgentId();
-        const sqlite = getSqliteClient(state.dbDir, state.projectHash);
-        if (!sqlite) {
-          return;
-        }
-
-        const lastSeen = await getLastSeenTimestamp(state.projectHash, agentId);
-        const unread = sqlite.getMessagesSince({
-          projectHash: state.projectHash,
-          sinceUnixMs: lastSeen,
-          limit: 50,
-        });
-
-        if (unread.length === 0) {
-          return;
-        }
-
-        // Build notification lines using shared function
-        const lines = buildNotificationText(unread);
-        if (!lines) {
-          return;
-        }
-
-        // Append notification lines to system array
-        output.system.push(...lines);
       },
 
       // Event handler for cleanup
@@ -475,28 +483,32 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
         // Handle session cleanup events
         // Note: "session.idle" and "session.deleted" are the actual session events in OpenCode SDK
         if (event.type === 'session.idle' || event.type === 'session.deleted') {
-          // Stop heartbeat
-          if (state.heartbeatManager) {
-            state.heartbeatManager.stop();
-            state.heartbeatManager = null;
+          try {
+            // Stop heartbeat
+            if (state.heartbeatManager) {
+              state.heartbeatManager.stop();
+              state.heartbeatManager = null;
+            }
+
+            // Clean up agent resources using lifecycle helper
+            if (state.connected && state.projectHash) {
+              const agentId = getSessionAgentId();
+              await cleanupAgent(state.projectHash, agentId);
+            }
+
+            // Clean up rate limiter
+            cleanupRateLimiter();
+
+            // Close SQLite connection
+            if (state.dbDir) {
+              closeSqliteClient(state.dbDir);
+              state.dbDir = null;
+            }
+
+            state.connected = false;
+          } catch (error) {
+            console.warn('[AgentSyncLayer] Session cleanup error:', error);
           }
-
-          // Clean up agent resources using lifecycle helper
-          if (state.connected && state.projectHash) {
-            const agentId = getSessionAgentId();
-            await cleanupAgent(state.projectHash, agentId);
-          }
-
-          // Clean up rate limiter
-          cleanupRateLimiter();
-
-          // Close SQLite connection
-          if (state.dbDir) {
-            closeSqliteClient(state.dbDir);
-            state.dbDir = null;
-          }
-
-          state.connected = false;
         }
       },
     };
