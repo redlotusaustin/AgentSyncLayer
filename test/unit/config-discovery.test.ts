@@ -22,87 +22,13 @@ describe('config-discovery (T3)', () => {
     }
   });
 
-  test('T3.2: config in parent, agent from child → found via ancestor walk', () => {
-    const { root, sub1, cleanup } = createTestDirTree();
-    try {
-      // Config in root
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
-
-      // Agent runs from sub1
-      const config = resolveBusConfig(sub1);
-      expect(config.source).toBe('config');
-      expect(config.bus_dir).toBe(root);
-      expect(config.configPath).toBe(path.join(root, '.agentsynclayer.json'));
-    } finally {
-      cleanup();
-    }
-  });
-
-  test('T3.3: config in grandparent (not parent or CWD) → walks up 2 levels', () => {
-    const { root, sub1, cleanup } = createTestDirTree();
-    try {
-      // Config in root (grandparent of sub1)
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
-
-      // Run from sub1 (parent is packages/)
-      const config = resolveBusConfig(sub1);
-      expect(config.source).toBe('config');
-      expect(config.bus_dir).toBe(root);
-    } finally {
-      cleanup();
-    }
-  });
-
-  test('T3.4: ancestor walk stops at .git/ → config above .git NOT found', () => {
-    const { root, sub1, cleanup } = createTestDirTree();
-    try {
-      // Create .git in root (simulating git root)
-      fs.mkdirSync(path.join(root, '.git'), { recursive: true });
-
-      // Config in root - but it should be ignored because we hit .git
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
-
-      // Config in sub1's parent (packages/)
-      const packagesDir = path.join(root, 'packages');
-      fs.writeFileSync(
-        path.join(packagesDir, '.agentsynclayer.json'),
-        JSON.stringify({ bus: '.' }),
-      );
-
-      // Run from sub1 - should find config in packages/, not root
-      const config = resolveBusConfig(sub1);
-      expect(config.source).toBe('config');
-      expect(config.bus_dir).toBe(packagesDir);
-    } finally {
-      cleanup();
-    }
-  });
-
-  test('T3.4b: .git boundary — config above git root is NOT found', () => {
-    // Create parent of test env root (temp dir) — this represents "outside the project"
-    const { root, sub1, cleanup } = createTestDirTree();
-    try {
-      // Create .git in root (simulating git root boundary)
-      fs.mkdirSync(path.join(root, '.git'), { recursive: true });
-
-      // NO config at root or packages/ (the usual search locations)
-
-      // Run from sub1 - should NOT find any config and fall back to default
-      // because .git stops the upward walk and there's no config in the search path
-      const config = resolveBusConfig(sub1);
-      expect(config.source).toBe('default');
-      expect(config.bus_dir).toBe(sub1);
-    } finally {
-      cleanup();
-    }
-  });
-
-  test('T3.5: ancestor walk at filesystem root → no crash, returns default', () => {
-    // Use /tmp as starting point (should eventually hit / or a .git)
+  test('T3.5: /tmp no config file → returns default without crash', () => {
+    // Use /tmp as starting point - should not crash even if no config
     const config = resolveBusConfig('/tmp');
     // Should not crash and should return some result
     expect(config).toBeDefined();
     expect(['default', 'config']).toContain(config.source);
+    expect(config.configPath).toBeNull();
   });
 
   test('T3.6: .agentsynclayer.json with {} (empty) → bus_dir defaults to config file dir', () => {
@@ -118,23 +44,171 @@ describe('config-discovery (T3)', () => {
     }
   });
 
-  test('T3.7: closest config wins — CWD config over parent', () => {
+  test('T3.8: config in parent NOT visible from subdirectory', () => {
     const { root, sub1, cleanup } = createTestDirTree();
     try {
       // Config in root
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: root }));
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
-      // Config in packages (closer to sub1)
-      const packagesDir = path.dirname(sub1);
-      fs.writeFileSync(
-        path.join(packagesDir, '.agentsynclayer.json'),
-        JSON.stringify({ bus: packagesDir }),
-      );
+      // Agent runs from sub1 - should NOT find ancestor config
+      const config = resolveBusConfig(sub1);
+      expect(config.source).toBe('default');
+      expect(config.bus_dir).toBe(sub1);
+    } finally {
+      cleanup();
+    }
+  });
 
-      // Run from sub1 - should find packages config first
+  test('T3.9: config in root NOT visible from packages subdirectory', () => {
+    const { root, sub1, cleanup } = createTestDirTree();
+    try {
+      // Config in root
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
+
+      // Run from sub1 - ancestor config should NOT be found
+      const config = resolveBusConfig(sub1);
+      expect(config.source).toBe('default');
+      expect(config.bus_dir).toBe(sub1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.10: config in sibling directory NOT visible', () => {
+    const { root, sub1, cleanup } = createTestDirTree();
+    try {
+      const sibling = path.join(root, 'sibling');
+      fs.mkdirSync(sibling, { recursive: true });
+
+      // Config in sibling
+      fs.writeFileSync(path.join(sibling, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
+
+      // Run from sub1 - sibling config should NOT be found
+      const config = resolveBusConfig(sub1);
+      expect(config.source).toBe('default');
+      expect(config.bus_dir).toBe(sub1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.11: each subdirectory has independent default config', () => {
+    const { sub1, sub2, cleanup } = createTestDirTree();
+    try {
+      // No config files anywhere
+
+      // Run from sub1
+      const config1 = resolveBusConfig(sub1);
+      expect(config1.source).toBe('default');
+      expect(config1.bus_dir).toBe(sub1);
+
+      // Reset cache to simulate fresh resolution
+      resetBusConfig();
+
+      // Run from sub2
+      const config2 = resolveBusConfig(sub2);
+      expect(config2.source).toBe('default');
+      expect(config2.bus_dir).toBe(sub2);
+
+      // They should have different project hashes
+      expect(config1.projectHash).not.toBe(config2.projectHash);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.12: monorepo each package needs its own config', () => {
+    const { root, sub1, sub2, cleanup } = createTestDirTree();
+    try {
+      // Config files in each package (for local config mode)
+      fs.writeFileSync(path.join(sub1, '.agentsynclayer.json'), JSON.stringify({ bus: root }));
+      fs.writeFileSync(path.join(sub2, '.agentsynclayer.json'), JSON.stringify({ bus: root }));
+
+      // Both should resolve to root for shared bus
+      const apiConfig = resolveBusConfig(sub1);
+      expect(apiConfig.source).toBe('config');
+      expect(apiConfig.bus_dir).toBe(root);
+
+      resetBusConfig();
+
+      const webConfig = resolveBusConfig(sub2);
+      expect(webConfig.source).toBe('config');
+      expect(webConfig.bus_dir).toBe(root);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.13: each monorepo package gets independent default when no config', () => {
+    const { sub1, sub2, cleanup } = createTestDirTree();
+    try {
+      // No config files anywhere
+
+      // Each package has its own default namespace
+      const apiConfig = resolveBusConfig(sub1);
+      const webConfig = resolveBusConfig(sub2);
+
+      expect(apiConfig.source).toBe('default');
+      expect(apiConfig.bus_dir).toBe(sub1);
+
+      resetBusConfig();
+
+      expect(webConfig.source).toBe('default');
+      expect(webConfig.bus_dir).toBe(sub2);
+
+      // They have different namespaces (no shared bus)
+      expect(apiConfig.projectHash).not.toBe(webConfig.projectHash);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.14: config with {"bus": "../.."} → resolves relative to CWD', () => {
+    const { root, sub1, cleanup } = createTestDirTree();
+    try {
+      fs.writeFileSync(path.join(sub1, '.agentsynclayer.json'), JSON.stringify({ bus: '../..' }));
       const config = resolveBusConfig(sub1);
       expect(config.source).toBe('config');
-      expect(config.bus_dir).toBe(packagesDir);
+      expect(config.bus_dir).toBe(root);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.15: config with absolute {"bus": "/tmp"} → uses absolute path', () => {
+    const { root, cleanup } = createTestBusEnv();
+    try {
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '/tmp' }));
+      const config = resolveBusConfig(root);
+      expect(config.source).toBe('config');
+      expect(config.bus_dir).toBe('/tmp');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.16: malformed JSON in CWD config → falls through to default', () => {
+    const { root, cleanup } = createTestBusEnv();
+    try {
+      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), '{ invalid json }');
+      const config = resolveBusConfig(root);
+      expect(config.source).toBe('default');
+      expect(config.bus_dir).toBe(root);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('T3.17: config with non-existent bus dir → falls through to default', () => {
+    const { root, cleanup } = createTestBusEnv();
+    try {
+      fs.writeFileSync(
+        path.join(root, '.agentsynclayer.json'),
+        JSON.stringify({ bus: '/nonexistent/path/that/does/not/exist' }),
+      );
+      const config = resolveBusConfig(root);
+      expect(config.source).toBe('default');
+      expect(config.bus_dir).toBe(root);
     } finally {
       cleanup();
     }

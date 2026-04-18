@@ -54,9 +54,18 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
 
   describe('I1.1: Cross-directory message exchange', () => {
     test('agent in sub1 can send message that agent in sub2 can read', async () => {
-      // Create monorepo structure with shared config
+      // Create monorepo structure with config files in each subdirectory
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
+
+      // With local config only, each subdirectory needs its own config to share bus
+      fs.writeFileSync(
+        path.join(sub1, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
+      fs.writeFileSync(
+        path.join(sub2, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -100,7 +109,16 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
 
     test('agent in sub2 can send reply that agent in sub1 can read', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
+
+      // With local config only, each subdirectory needs its own config to share bus
+      fs.writeFileSync(
+        path.join(sub1, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
+      fs.writeFileSync(
+        path.join(sub2, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -138,7 +156,16 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
   describe('I1.2: Agent visibility across directories', () => {
     test('both agents see each other in bus_agents', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
+
+      // With local config only, each subdirectory needs its own config to share bus
+      fs.writeFileSync(
+        path.join(sub1, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
+      fs.writeFileSync(
+        path.join(sub2, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -179,7 +206,16 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
   describe('I1.3: File claims visible across directories', () => {
     test('claim from sub1 visible to sub2', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
+
+      // With local config only, each subdirectory needs its own config to share bus
+      fs.writeFileSync(
+        path.join(sub1, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
+      fs.writeFileSync(
+        path.join(sub2, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -212,7 +248,16 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
 
     test('different files can be claimed independently', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
+
+      // With local config only, each subdirectory needs its own config to share bus
+      fs.writeFileSync(
+        path.join(sub1, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
+      fs.writeFileSync(
+        path.join(sub2, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');
@@ -246,7 +291,16 @@ describe('I1: Monorepo Cross-Directory Communication', () => {
   describe('I1.4: History visible across directories', () => {
     test('bus_history returns messages from both agents', async () => {
       const { root, sub1, sub2, cleanup } = createTestDirTree();
-      fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
+
+      // With local config only, each subdirectory needs its own config to share bus
+      fs.writeFileSync(
+        path.join(sub1, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
+      fs.writeFileSync(
+        path.join(sub2, '.agentsynclayer.json'),
+        JSON.stringify({ bus: root }),
+      );
 
       const agent1Id = generateTestAgentId('mono1');
       const agent2Id = generateTestAgentId('mono2');

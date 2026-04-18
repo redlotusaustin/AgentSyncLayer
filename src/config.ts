@@ -3,7 +3,7 @@
  *
  * Handles resolution of bus identity configuration from multiple sources:
  * 1. Environment variable: AGENTSYNCLAYER_BUS_ID (highest priority)
- * 2. Config file: .agentsynclayer.json (discovered via ancestor walk)
+ * 2. Config file: .agentsynclayer.json (in current directory only)
  * 3. Default: use cwd as bus identity (lowest priority)
  *
  * The resolved configuration determines:
@@ -16,6 +16,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+import { z } from 'zod';
 
 import { hashProjectPath } from './namespace';
 
@@ -87,7 +89,7 @@ export function resetBusConfig(): void {
  *
  * Resolution order:
  * 1. AGENTSYNCLAYER_BUS_ID environment variable (highest priority)
- * 2. .agentsynclayer.json file via ancestor walk (CWD to git root)
+ * 2. .agentsynclayer.json file in current directory only (no ancestor walk)
  * 3. Default: use cwd as bus identity
  *
  * Results are cached per canonical cwd. Subsequent calls return
@@ -126,8 +128,8 @@ export function resolveBusConfig(cwd: string): BusConfig {
     return config;
   }
 
-  // Phase 2: Ancestor walk for .agentsynclayer.json
-  config = resolveFromAncestorWalk(canonicalCwd);
+  // Phase 2: Check for config in current directory only
+  config = resolveFromLocalConfig(canonicalCwd);
   if (config) {
     configCache.set(canonicalCwd, config);
     return config;
@@ -153,26 +155,32 @@ function resolveFromEnv(): BusConfig | null {
   try {
     const busDir = fs.realpathSync(envValue);
 
+    // Log resolved path for operator transparency
+    console.warn(
+      '[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID resolved to:',
+      busDir,
+      '(from:',
+      envValue,
+      ')',
+    );
+
     // Validate it's a directory
     if (!fs.statSync(busDir).isDirectory()) {
       console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID is not a directory:', envValue);
       return null;
     }
 
-    // db_dir is same as bus_dir when using env var
-    const dbDir = busDir;
-
-    // Validate db_dir is creatable (mkdir -p will create it)
+    // Validate bus_dir is creatable (mkdir -p will create it)
     try {
-      fs.mkdirSync(dbDir, { recursive: true });
+      fs.mkdirSync(busDir, { recursive: true });
     } catch {
-      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID db_dir is not creatable:', dbDir);
+      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID db_dir is not creatable:', busDir);
       return null;
     }
 
     return {
       bus_dir: busDir,
-      db_dir: dbDir,
+      db_dir: busDir,
       projectHash: hashProjectPath(busDir),
       source: 'env',
       configPath: null,
@@ -184,45 +192,29 @@ function resolveFromEnv(): BusConfig | null {
 }
 
 /**
- * Walk up the directory tree from cwd to find .agentsynclayer.json.
+ * Check for .agentsynclayer.json in the current directory only.
  *
- * Stops when reaching filesystem root or a directory containing .git/
+ * Does NOT walk up the directory tree (no ancestor walk).
  *
  * @param canonicalCwd - Canonical current working directory
  * @returns BusConfig if config file found and valid, null otherwise
  */
-function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
-  let dir = canonicalCwd;
-
-  // Walk up until we hit filesystem root or .git/ directory
-  while (dir !== path.dirname(dir)) {
-    const configPath = path.join(dir, '.agentsynclayer.json');
-    const gitPath = path.join(dir, '.git');
-
-    // Check config first — config at git root should be used.
-    // .git only stops upward walk when no config at this level.
-    if (fs.existsSync(configPath)) {
-      try {
-        return parseConfig(configPath, dir);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[AgentSyncLayer] Invalid config in:', configPath, message);
-      }
-    }
-
-    // Check if we've hit a git root (only after confirming no config)
-    try {
-      fs.statSync(gitPath);
-      break;
-    } catch {
-      // Not at git root, continue walking
-    }
-
-    dir = path.dirname(dir);
+function resolveFromLocalConfig(canonicalCwd: string): BusConfig | null {
+  const configPath = path.join(canonicalCwd, '.agentsynclayer.json');
+  try {
+    return parseConfig(configPath, canonicalCwd);
+  } catch {
+    return null;
   }
-
-  return null;
 }
+
+/** Zod schema for .agentsynclayer.json config file */
+const ConfigFileSchema = z
+  .object({
+    bus: z.string().optional(),
+    db: z.string().optional(),
+  })
+  .strict();
 
 /**
  * Parse a .agentsynclayer.json config file.
@@ -233,17 +225,25 @@ function resolveFromAncestorWalk(canonicalCwd: string): BusConfig | null {
  * @throws Error if parsing fails or paths are invalid
  */
 function parseConfig(configPath: string, configDir: string): BusConfig {
-  // Read and parse JSON
+  // Read, validate, and parse JSON
   let raw: AgentSyncLayerConfigFile;
   try {
-    const content = fs.readFileSync(configPath, 'utf-8');
-    raw = JSON.parse(content);
+    const fileContent = fs.readFileSync(configPath, 'utf-8');
+    raw = ConfigFileSchema.parse(JSON.parse(fileContent));
   } catch (error) {
-    console.warn(
-      '[AgentSyncLayer] Failed to read/parse config file:',
-      configPath,
-      error instanceof Error ? error.message : String(error),
-    );
+    if (error instanceof z.ZodError) {
+      console.warn(
+        '[AgentSyncLayer] Invalid config file (unknown keys):',
+        configPath,
+        error.issues.map((e) => e.message).join(', '),
+      );
+    } else {
+      console.warn(
+        '[AgentSyncLayer] Failed to read/parse config file:',
+        configPath,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
     throw new Error('Failed to parse config');
   }
 
@@ -251,39 +251,27 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
   const busRelative = raw.bus ?? '.';
   let busDir: string;
   try {
-    if (path.isAbsolute(busRelative)) {
-      busDir = fs.realpathSync(busRelative);
-    } else {
-      busDir = fs.realpathSync(path.join(configDir, busRelative));
-    }
+    busDir = path.isAbsolute(busRelative)
+      ? fs.realpathSync(busRelative)
+      : fs.realpathSync(path.join(configDir, busRelative));
   } catch {
     console.warn('[AgentSyncLayer] Config bus directory could not be resolved:', busRelative);
     throw new Error('Invalid bus directory');
   }
 
   // Validate bus_dir is a directory
-  try {
-    if (!fs.statSync(busDir).isDirectory()) {
-      console.warn('[AgentSyncLayer] Config bus is not a directory:', busDir);
-      throw new Error('bus is not a directory');
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message === 'bus is not a directory') {
-      throw error;
-    }
-    console.warn('[AgentSyncLayer] Config bus directory does not exist:', busDir);
-    throw new Error('bus directory does not exist');
+  if (!fs.statSync(busDir).isDirectory()) {
+    console.warn('[AgentSyncLayer] Config bus is not a directory:', busDir);
+    throw new Error('bus is not a directory');
   }
 
   // Resolve db_dir (default: same relative value as bus)
   const dbRelative = raw.db ?? raw.bus ?? '.';
   let dbDir: string;
   try {
-    if (path.isAbsolute(dbRelative)) {
-      dbDir = fs.realpathSync(dbRelative);
-    } else {
-      dbDir = fs.realpathSync(path.join(configDir, dbRelative));
-    }
+    dbDir = path.isAbsolute(dbRelative)
+      ? fs.realpathSync(dbRelative)
+      : fs.realpathSync(path.join(configDir, dbRelative));
   } catch {
     console.warn('[AgentSyncLayer] Config db directory could not be resolved:', dbRelative);
     throw new Error('Invalid db directory');

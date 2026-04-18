@@ -2,7 +2,7 @@
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.5.0
+Version 0.6.0
 
 ---
 
@@ -169,7 +169,7 @@ This means:
 
 ### Shared Bus Configuration
 
-For monorepos and multi-project setups, you can share a bus namespace across different directories using a `.agentsynclayer.json` config file:
+For monorepos and multi-project setups, you can share a bus namespace across different directories using a `.agentsynclayer.json` config file. Place the config file in **each directory that needs the shared bus**.
 
 ```json
 {
@@ -178,24 +178,28 @@ For monorepos and multi-project setups, you can share a bus namespace across dif
 ```
 
 **How it works:**
-1. AgentSyncLayer walks up from the current directory to find `.agentsynclayer.json`
+1. AgentSyncLayer looks for `.agentsynclayer.json` in the current working directory only (no ancestor walk)
 2. The config file's `bus` directory determines the project hash
 3. All agents pointing to the same `bus` directory share the same Redis namespace and SQLite database
+4. For monorepos, place `.agentsynclayer.json` in **each** package that needs the shared bus
 
 **Example: Monorepo**
 
-Place `.agentsynclayer.json` at the monorepo root:
+Place `.agentsynclayer.json` in each package that needs the shared bus:
 
 ```json
-// /mono/.agentsynclayer.json
-{ "bus": "." }
+// /mono/packages/api/.agentsynclayer.json
+{ "bus": "../.." }
+
+// /mono/packages/web/.agentsynclayer.json
+{ "bus": "../.." }
 ```
 
 Now agents in `/mono/packages/api` and `/mono/packages/web` share the same bus, see each other's messages, and use the same SQLite history database.
 
 **Configuration precedence (highest to lowest):**
 1. `AGENTSYNCLAYER_BUS_ID` environment variable
-2. `.agentsynclayer.json` discovered via ancestor walk
+2. `.agentsynclayer.json` in current directory only (no ancestor walk)
 3. Default: use current working directory
 
 ---
@@ -755,7 +759,7 @@ bus_send(channel="my-channel", message="Hello")
 
 **Cause**: Different project namespaces.
 
-**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). In monorepos, ensure `.agentsynclayer.json` is at the shared root.
+**Fix**: Both agents must be running in the same project directory (or symlinked directories that resolve to the same canonical path). In monorepos, ensure each package has its own `.agentsynclayer.json` pointing to the shared bus root.
 
 ### Verifying bus configuration
 
