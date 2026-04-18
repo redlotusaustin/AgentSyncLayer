@@ -23,12 +23,16 @@ export async function busAgentsExecute(
   _args: Record<string, never>,
   context: ToolContext,
 ): Promise<ToolResponse<AgentsResponseData>> {
-  if (!getRedisClient().checkConnection()) {
-    return unavailableResponse();
-  }
-
   // Guard against missing or malformed context (defense-in-depth)
   if (!context || typeof context.directory !== 'string') {
+    return {
+      ok: false,
+      error: 'Context directory is required',
+      code: 'INVALID_CONTEXT' as const,
+    };
+  }
+
+  if (!getRedisClient().checkConnection()) {
     return unavailableResponse();
   }
 

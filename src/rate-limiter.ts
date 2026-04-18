@@ -8,7 +8,7 @@
  */
 
 import type { RateLimiterBucket } from './types';
-import { RateLimitException } from './validation';
+import { isValidAgentId, RateLimitException } from './validation';
 
 /**
  * Default maximum messages per second per agent
@@ -51,6 +51,10 @@ export class RateLimiter {
    * @throws RateLimitException if rate limit exceeded
    */
   check(agentId: string): void {
+    // Skip rate limiting for unrecognized agent ID formats (be permissive)
+    if (!isValidAgentId(agentId)) {
+      return;
+    }
     const now = Date.now();
     const bucket = this.buckets.get(agentId);
 
@@ -93,6 +97,10 @@ export class RateLimiter {
    * @returns True if allowed, false if rate limited
    */
   tryCheck(agentId: string): boolean {
+    // Skip rate limiting for unrecognized agent ID formats (be permissive)
+    if (!isValidAgentId(agentId)) {
+      return true;
+    }
     try {
       this.check(agentId);
       return true;
@@ -108,6 +116,10 @@ export class RateLimiter {
    * @returns Number of messages still allowed in this window
    */
   getRemainingCapacity(agentId: string): number {
+    // Skip rate limiting for unrecognized agent ID formats (be permissive)
+    if (!isValidAgentId(agentId)) {
+      return this.maxPerSecond;
+    }
     const now = Date.now();
     const bucket = this.buckets.get(agentId);
 
@@ -166,6 +178,10 @@ export class RateLimiter {
    * @returns True if at or above rate limit
    */
   isLimited(agentId: string): boolean {
+    // Skip rate limiting for unrecognized agent ID formats (be permissive)
+    if (!isValidAgentId(agentId)) {
+      return false;
+    }
     return this.getRemainingCapacity(agentId) === 0;
   }
 
@@ -175,6 +191,10 @@ export class RateLimiter {
    * @param agentId - The agent ID
    */
   reset(agentId: string): void {
+    // Skip rate limiting for unrecognized agent ID formats (be permissive)
+    if (!isValidAgentId(agentId)) {
+      return;
+    }
     this.buckets.delete(agentId);
   }
 
