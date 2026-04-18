@@ -1,0 +1,72 @@
+{
+  "name": "opencode-asl",
+  "version": "0.6.0",
+  "description": "Redis-backed pub/sub messaging for coordinating multiple AI agent sessions",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src/",
+    "LICENSE",
+    "README.md"
+  ],
+  "keywords": [
+    "opencode",
+    "agent",
+    "coordination",
+    "redis",
+    "pubsub",
+    "ai",
+    "messaging",
+    "claude",
+    "multi-agent",
+    "file-claims"
+  ],
+  "author": "AgentSyncLayer contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/redlotusaustin/AgentSyncLayer.git",
+    "directory": "AgentSyncLayer"
+  },
+  "homepage": "https://github.com/redlotusaustin/AgentSyncLayer/tree/main/AgentSyncLayer#readme",
+  "bugs": {
+    "url": "https://github.com/redlotusaustin/AgentSyncLayer/issues"
+  },
+  "scripts": {
+    "test": "bun test",
+    "test:unit": "bun test test/unit/",
+    "test:integration": "bun test test/integration/",
+    "typecheck": "tsc --noEmit",
+    "lint": "bunx biome check src/ bus-monitor.ts smoke-test.ts",
+    "lint:fix": "bunx biome check --write --unsafe src/ bus-monitor.ts smoke-test.ts",
+    "format": "bunx biome format --write src/ bus-monitor.ts smoke-test.ts",
+    "check": "tsc --noEmit && bunx biome check src/ bus-monitor.ts smoke-test.ts",
+    "prepublishOnly": "bun run check && bun test"
+  },
+  "dependencies": {
+    "ioredis": "^5.3.2",
+    "opencode-asl": "^0.6.0",
+    "zod": "^4.1.0"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "^1.4.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.11",
+    "@opencode-ai/plugin": "^1.4.0",
+    "@types/bun": "^1.0.0",
+    "@types/node": "^20.11.0",
+    "bun-types": "^1.1.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
