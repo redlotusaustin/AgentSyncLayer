@@ -1,6 +1,6 @@
 {
   "name": "opencode-asl",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "Redis-backed pub/sub messaging for coordinating multiple AI agent sessions",
   "license": "MIT",
   "type": "module",
@@ -52,6 +52,7 @@
   },
   "dependencies": {
     "ioredis": "^5.3.2",
+    "opencode-asl": "0.6.3",
     "zod": "^4.1.0"
   },
   "peerDependencies": {

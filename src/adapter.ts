@@ -13,7 +13,6 @@
  */
 
 import type { Plugin, PluginInput, ToolContext } from '@opencode-ai/plugin';
-import { tool } from '@opencode-ai/plugin';
 
 import z from 'zod';
 import { resolveBusConfig } from './config';
@@ -95,13 +94,41 @@ function responseToString(response: unknown): string {
 }
 
 // ============================================================================
+// defineTool - Local helper to avoid runtime import of @opencode-ai/plugin
+// ============================================================================
+
+/**
+ * Local implementation of OpenCode's `tool()` that produces the same shape.
+ * This avoids importing `tool` from @opencode-ai/plugin at runtime, which
+ * prevents the "effect" library duplication issue when the plugin is loaded
+ * via NPM (which installs it in an isolated cache with its own SDK copy).
+ *
+ * Matches the SDK's tool() signature for type compatibility.
+ */
+function defineTool<Args extends z.ZodRawShape>(input: {
+  description: string;
+  args: Args;
+  execute(args: z.infer<z.ZodObject<Args>>, context: ToolContext): Promise<string>;
+}): {
+  description: string;
+  args: Args;
+  execute(args: z.infer<z.ZodObject<Args>>, context: ToolContext): Promise<string>;
+} {
+  return {
+    description: input.description,
+    args: input.args,
+    execute: input.execute,
+  };
+}
+
+// ============================================================================
 // Tool Definitions
 // ============================================================================
 
 /**
  * bus_send — Publish a message to a bus channel
  */
-const bus_send = tool({
+const bus_send = defineTool({
   description:
     'Publish a message to a bus channel. Use this to communicate with other agents in the project.',
   args: {
@@ -125,7 +152,7 @@ const bus_send = tool({
 /**
  * bus_read — Read recent messages from a channel
  */
-const bus_read = tool({
+const bus_read = defineTool({
   description: 'Read recent messages from a bus channel. Returns messages sorted newest first.',
   args: {
     channel: z.string().min(1).max(64).describe('The channel name to read from'),
@@ -146,7 +173,7 @@ const bus_read = tool({
 /**
  * bus_channels — List all active channels
  */
-const bus_channels = tool({
+const bus_channels = defineTool({
   description:
     'List all active channels in the current project. Shows channel names and message counts.',
   args: {},
@@ -159,7 +186,7 @@ const bus_channels = tool({
 /**
  * bus_status — Update this agent's status
  */
-const bus_status = tool({
+const bus_status = defineTool({
   description:
     "Update this agent's status for other agents to see. Includes task description, files, and subscribed channels.",
   args: {
@@ -179,7 +206,7 @@ const bus_status = tool({
 /**
  * bus_agents — List all active agents
  */
-const bus_agents = tool({
+const bus_agents = defineTool({
   description:
     'List all active agents in the current project with their status and subscribed channels.',
   args: {},
@@ -192,7 +219,7 @@ const bus_agents = tool({
 /**
  * bus_info — Get bus configuration info
  */
-const bus_info = tool({
+const bus_info = defineTool({
   description:
     'Get bus configuration info for the current project. Returns project hash, bus directory, db directory, and config source.',
   args: {},
@@ -205,7 +232,7 @@ const bus_info = tool({
 /**
  * bus_claim — Claim a file for editing
  */
-const bus_claim = tool({
+const bus_claim = defineTool({
   description:
     'Claim a file for editing (advisory lock). Prevents other agents from editing the same file.',
   args: {
@@ -224,7 +251,7 @@ const bus_claim = tool({
 /**
  * bus_release — Release a file claim
  */
-const bus_release = tool({
+const bus_release = defineTool({
   description: 'Release a file claim. Must be the owner of the claim to release it.',
   args: {
     path: z
@@ -241,7 +268,7 @@ const bus_release = tool({
 /**
  * bus_listen — Long-poll for new messages
  */
-const bus_listen = tool({
+const bus_listen = defineTool({
   description:
     'Long-poll for new messages on specified channels. Waits for new messages or times out.',
   args: {
@@ -266,7 +293,7 @@ const bus_listen = tool({
 /**
  * bus_history — Read deep message history from SQLite
  */
-const bus_history = tool({
+const bus_history = defineTool({
   description:
     'Read deep message history from SQLite. Returns paginated results sorted newest first. Use this to review past coordination or find messages older than what bus_read returns.',
   args: {
@@ -294,7 +321,7 @@ const bus_history = tool({
 /**
  * bus_search — Search message history using full-text search
  */
-const bus_search = tool({
+const bus_search = defineTool({
   description:
     'Search message history using full-text search. Returns messages matching the query, ranked by relevance.',
   args: {
