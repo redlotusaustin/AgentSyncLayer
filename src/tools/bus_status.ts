@@ -46,6 +46,15 @@ export async function busStatusExecute(
     };
   }
 
+  // Guard against missing context
+  if (!context?.directory) {
+    return {
+      ok: false,
+      error: 'Context directory is required',
+      code: 'INVALID_CONTEXT',
+    };
+  }
+
   try {
     // Validate task (max 256 chars as per contract)
     const task = args.task?.trim() ?? '';

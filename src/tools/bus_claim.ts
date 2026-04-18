@@ -143,7 +143,12 @@ export async function busClaimExecute(
   | {
       ok: false;
       error: string;
-      code: 'BUS_UNAVAILABLE' | 'PATH_INVALID' | 'CLAIM_CONFLICT' | 'INTERNAL_ERROR';
+      code:
+        | 'BUS_UNAVAILABLE'
+        | 'INVALID_CONTEXT'
+        | 'PATH_INVALID'
+        | 'CLAIM_CONFLICT'
+        | 'INTERNAL_ERROR';
     }
 > {
   const redis = getRedisClient();
@@ -154,6 +159,15 @@ export async function busClaimExecute(
       ok: false,
       error: 'Bus unavailable: Redis connection not established',
       code: 'BUS_UNAVAILABLE',
+    };
+  }
+
+  // Guard against missing context
+  if (!context?.directory) {
+    return {
+      ok: false,
+      error: 'Context directory is required',
+      code: 'INVALID_CONTEXT',
     };
   }
 

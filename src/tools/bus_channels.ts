@@ -32,6 +32,15 @@ export async function busChannelsExecute(
     };
   }
 
+  // Guard against missing context
+  if (!context?.directory) {
+    return {
+      ok: false,
+      error: 'Context directory is required',
+      code: 'INVALID_CONTEXT',
+    };
+  }
+
   try {
     // Get project hash
     const projectHash = resolveProjectHash(context.directory);

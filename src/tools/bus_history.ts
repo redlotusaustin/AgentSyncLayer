@@ -58,6 +58,15 @@ export async function busHistoryExecute(
   args: BusHistoryArgs,
   context: ToolContext,
 ): Promise<ToolResponse<HistoryResponseData>> {
+  // Guard against missing context
+  if (!context?.directory) {
+    return {
+      ok: false,
+      error: 'Context directory is required',
+      code: 'INVALID_CONTEXT',
+    };
+  }
+
   const projectHash = resolveProjectHash(context.directory);
 
   try {

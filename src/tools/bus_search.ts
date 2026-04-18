@@ -60,6 +60,15 @@ export async function busSearchExecute(
   args: BusSearchArgs,
   context: ToolContext,
 ): Promise<ToolResponse<SearchResponseData>> {
+  // Guard against missing context
+  if (!context?.directory) {
+    return {
+      ok: false,
+      error: 'Context directory is required',
+      code: 'INVALID_CONTEXT',
+    };
+  }
+
   const projectHash = resolveProjectHash(context.directory);
 
   try {

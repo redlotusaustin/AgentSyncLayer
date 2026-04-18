@@ -55,6 +55,15 @@ export async function busListenExecute(
     };
   }
 
+  // Guard against missing context
+  if (!context?.directory) {
+    return {
+      ok: false,
+      error: 'Context directory is required',
+      code: 'INVALID_CONTEXT',
+    };
+  }
+
   try {
     // Validate and normalize channels
     const channels =

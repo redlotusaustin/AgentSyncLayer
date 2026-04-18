@@ -81,6 +81,7 @@ export interface Claim {
 export type ErrorCode =
   | 'BUS_UNAVAILABLE'
   | 'CHANNEL_INVALID'
+  | 'INVALID_CONTEXT'
   | 'CLAIM_CONFLICT'
   | 'CLAIM_NOT_FOUND'
   | 'CLAIM_NOT_OWNER'
