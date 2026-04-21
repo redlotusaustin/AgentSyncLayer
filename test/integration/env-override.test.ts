@@ -222,7 +222,9 @@ describe('I2: Env Var Override', () => {
       try {
         // Create .agentsynclayer.json in cwd pointing to cwd
         // But set AGENTSYNCLAYER_BUS_ID to different directory
+        // Also set DB_DIR to test per-field precedence
         process.env.AGENTSYNCLAYER_BUS_ID = sharedDir;
+        process.env.AGENTSYNCLAYER_DB_DIR = sharedDir;
         resetBusConfig();
 
         // Resolving from cwd should use env var, not .agentsynclayer.json
@@ -231,6 +233,7 @@ describe('I2: Env Var Override', () => {
         expect(config.source).toBe('env');
         expect(config.bus_dir).toBe(sharedDir);
         expect(config.db_dir).toBe(sharedDir);
+        expect(config.redis_url).toBeDefined();  // redis_url from env or default
         expect(config.configPath).toBeNull();
 
         // Project hash should be based on sharedDir, not cwd
@@ -247,15 +250,17 @@ describe('I2: Env Var Override', () => {
       const { cleanup: cleanup2 } = createTestDir();
 
       try {
-        // Create different configs
+        // Create different configs - set both to test per-field precedence
         process.env.AGENTSYNCLAYER_BUS_ID = sharedDir;
+        process.env.AGENTSYNCLAYER_DB_DIR = sharedDir;
         resetBusConfig();
 
         const configFromEnv = resolveBusConfig(cwd);
         expect(configFromEnv.source).toBe('env');
 
-        // Unset env var and resolve again
+        // Unset env vars and resolve again
         delete process.env.AGENTSYNCLAYER_BUS_ID;
+        delete process.env.AGENTSYNCLAYER_DB_DIR;
         resetBusConfig();
 
         const configFromFile = resolveBusConfig(cwd);
