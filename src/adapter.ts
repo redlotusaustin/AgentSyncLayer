@@ -33,7 +33,7 @@ import {
   getMyClaims,
   getRecentMessages,
 } from './lifecycle';
-import { getRedisClient } from './redis';
+import { getRedisClient, resetRedisClient } from './redis';
 import { getSessionAgentId } from './session';
 import { closeSqliteClient, getSqliteClient } from './sqlite';
 // Import existing tool implementations
@@ -352,6 +352,7 @@ export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
   try {
     const { directory } = input;
     const busConfig = resolveBusConfig(directory);
+    resetRedisClient();
     const redis = getRedisClient({ url: busConfig.redis_url });
     const projectHash = busConfig.projectHash;
     const dbDir = busConfig.db_dir;
