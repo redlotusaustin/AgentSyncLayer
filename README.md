@@ -2,11 +2,27 @@
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.8.6
+Version 0.9.2
 
 ---
 
 AgentSyncLayer enables multiple OpenCode AI agent sessions running on the same project to communicate and coordinate with each other. It provides a message bus for broadcasting status updates, advisory file claims to prevent conflicting edits, and real-time coordination between agents—all backed by Redis for persistence and low-latency delivery.
+
+## Installation
+
+Add `opencode-asl` to the `plugin` array in your OpenCode config:
+
+```json
+{
+  "plugin": ["opencode-asl"]
+}
+```
+
+Place this in `~/.config/opencode/opencode.json` (global) or `opencode.json` in your project root (project-level). OpenCode will download and install the plugin automatically — no manual `npm install` needed.
+
+Requires **Redis ≥ 6.0** running on localhost:6379 (or configure a custom URL in [Configuration](#configuration)).
+
+---
 
 ## Table of Contents
 
@@ -15,7 +31,7 @@ AgentSyncLayer enables multiple OpenCode AI agent sessions running on the same p
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
-- [Usage Guide](#usage-guide)
+- [Usage Examples](#usage-examples)
 - [API Reference](#api-reference)
 - [Architecture](#architecture)
 - [Troubleshooting](#troubleshooting)
@@ -123,13 +139,6 @@ bus_info()
 
 Should return configuration including project hash and bus directory.
 
-### 3. Load in OpenCode
-
-AgentSyncLayer integrates as an OpenCode plugin. The exact loading mechanism depends on your OpenCode setup. Generally, ensure:
-
-1. The plugin entry point (`src/index.ts`) is accessible
-2. OpenCode loads the plugin with project context (directory, worktree)
-
 ---
 
 ## Configuration
@@ -234,6 +243,52 @@ Each field is resolved independently:
 - `AGENTSYNCLAYER_REDIS_URL` > `redis` key > default
 - `AGENTSYNCLAYER_BUS_DIR` > `bus` key > default
 - `AGENTSYNCLAYER_DB_DIR` > `db` key > default
+
+---
+
+## Usage Examples
+
+Plain-English prompts you can give to your agent. The agent will call the appropriate bus tools automatically.
+
+### Check if the bus is working
+
+> "Can you see the ASL bus?"
+
+### Send a message
+
+> "Send a message to the ASL bus saying I'm starting work on the auth module"
+> "Post an error to the bus: Redis connection keeps dropping"
+> "Let the other agents know I've finished the API refactor"
+
+### Check what's happening
+
+> "What messages are on the general channel?"
+> "Check #docs for any new messages"
+> "Are there any errors on the bus?"
+> "Search the bus history for mentions of rate limiting"
+
+### See who's around
+
+> "Who else is working on this project?"
+> "What are the other agents doing?"
+> "Show me all active agents and their current tasks"
+
+### Coordinate file edits
+
+> "Claim src/auth/login.ts before I start editing it"
+> "Check if anyone has claimed the config file"
+> "Release my claim on src/auth/login.ts, I'm done"
+> "Who has src/api/routes.ts claimed?"
+
+### Announce your status
+
+> "Update my status to: implementing JWT authentication, working on login.ts and session.ts"
+> "Let the bus know I'm switching to work on the frontend"
+
+### Wait for updates
+
+> "Listen on the general channel for 30 seconds"
+> "Watch for any new messages on claims or general"
 
 ---
 
@@ -826,7 +881,7 @@ bus_info()
 ```
 
 The `source` field shows how the bus was resolved:
-- `env` — From `AGENTSYNCLAYER_BUS_ID` environment variable
+- `env` — From `AGENTSYNCLAYER_BUS_DIR` environment variable
 - `config` — From `.agentsynclayer.json` file
 - `default` — From current working directory
 
@@ -920,18 +975,4 @@ AgentSyncLayer is written in TypeScript and uses Bun's built-in TypeScript suppo
 
 MIT
 
----
 
-## Installation
-
-```bash
-npm install opencode-asl
-```
-
-Then add to your OpenCode config (`~/.config/opencode/opencode.json` or project `opencode.json`):
-
-```json
-{
-  "plugin": ["opencode-asl"]
-}
-```
