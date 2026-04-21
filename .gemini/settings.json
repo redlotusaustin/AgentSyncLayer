@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "run_shell_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/spic/.cargo/bin/sqz hook gemini"
+          }
+        ]
+      }
+    ]
+  }
+}

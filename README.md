@@ -8,20 +8,6 @@ Version 0.9.2
 
 AgentSyncLayer enables multiple OpenCode AI agent sessions running on the same project to communicate and coordinate with each other. It provides a message bus for broadcasting status updates, advisory file claims to prevent conflicting edits, and real-time coordination between agents—all backed by Redis for persistence and low-latency delivery.
 
-## Installation
-
-Add `opencode-asl` to the `plugin` array in your OpenCode config:
-
-```json
-{
-  "plugin": ["opencode-asl"]
-}
-```
-
-Place this in `~/.config/opencode/opencode.json` (global) or `opencode.json` in your project root (project-level). OpenCode will download and install the plugin automatically — no manual `npm install` needed.
-
-Requires **Redis ≥ 6.0** running on localhost:6379 (or configure a custom URL in [Configuration](#configuration)).
-
 ---
 
 ## Table of Contents
@@ -106,6 +92,20 @@ AgentSyncLayer provides 11 tools for agent coordination:
 ---
 
 ## Quick Start
+
+Add `opencode-asl` to the `plugin` array in your OpenCode config:
+
+```json
+{
+  "plugin": ["opencode-asl"]
+}
+```
+
+Place this in `~/.config/opencode/opencode.json` (global) or `opencode.json` in your project root (project-level). OpenCode will download and install the plugin automatically — no manual `npm install` needed.
+
+Requires **Redis ≥ 6.0** running on localhost:6379 (or configure a custom URL in [Configuration](#configuration)).
+
+## Installation
 
 ### 1. Start Redis
 
