@@ -2,13 +2,17 @@
  * Configuration resolution for AgentSyncLayer
  *
  * Handles resolution of bus identity configuration from multiple sources:
- * 1. Environment variable: AGENTSYNCLAYER_BUS_ID (highest priority)
+ * 1. Environment variables (highest priority)
  * 2. Config file: .agentsynclayer.json (in current directory only)
  * 3. Default: use cwd as bus identity (lowest priority)
+ *
+ * Per-field precedence: each option resolved independently.
+ * Example: AGENTSYNCLAYER_REDIS_URL + config file for bus + default db -> env redis + config bus + default db
  *
  * The resolved configuration determines:
  * - bus_dir: Directory used for project hash computation (Redis namespace)
  * - db_dir: Directory where .agentsynclayer/history.db is stored
+ * - redis_url: Redis connection URL (for Redis client)
  * - projectHash: 12-character hex hash of bus_dir
  * - source: How the config was resolved ('env', 'config', or 'default')
  * - configPath: Absolute path to .agentsynclayer.json if found, null otherwise
@@ -29,14 +33,16 @@ import { hashProjectPath } from './namespace';
  * // Bus directory specified
  * { "bus": "." }
  *
- * // Both directories specified
- * { "bus": ".", "db": "/shared/data" }
+ * // All options specified
+ * { "bus": ".", "db": "/shared/data", "redis": "redis://custom:6379" }
  */
 export interface AgentSyncLayerConfigFile {
   /** Directory for project hash (defaults to config file's directory) */
   bus?: string;
   /** Directory for SQLite database (defaults to bus value) */
   db?: string;
+  /** Redis connection URL (defaults to redis://localhost:6379) */
+  redis?: string;
 }
 
 /**
@@ -44,19 +50,21 @@ export interface AgentSyncLayerConfigFile {
  *
  * @example
  * // From environment variable
- * { bus_dir: '/shared/workspace', db_dir: '/shared/workspace', projectHash: 'a1b2c3d4e5f6', source: 'env', configPath: null }
+ * { bus_dir: '/shared/workspace', db_dir: '/shared/workspace', redis_url: 'redis://custom:6379', projectHash: 'a1b2c3d4e5f6', source: 'env', configPath: null }
  *
  * // From config file
- * { bus_dir: '/mono', db_dir: '/mono', projectHash: 'f7e8d9c0b1a2', source: 'config', configPath: '/mono/.agentsynclayer.json' }
+ * { bus_dir: '/mono', db_dir: '/mono', redis_url: 'redis://share:6379', projectHash: 'f7e8d9c0b1a2', source: 'config', configPath: '/mono/.agentsynclayer.json' }
  *
  * // From default (no config)
- * { bus_dir: '/project', db_dir: '/project', projectHash: '123456789abc', source: 'default', configPath: null }
+ * { bus_dir: '/project', db_dir: '/project', redis_url: 'redis://localhost:6379', projectHash: '123456789abc', source: 'default', configPath: null }
  */
 export interface BusConfig {
   /** Directory used for project hash computation (Redis key prefix) */
   bus_dir: string;
   /** Directory where .agentsynclayer/history.db is stored */
   db_dir: string;
+  /** Redis connection URL */
+  redis_url: string;
   /** 12-character hex project hash: hashProjectPath(bus_dir) */
   projectHash: string;
   /** How the config was resolved */
@@ -85,10 +93,11 @@ export function resetBusConfig(): void {
 /**
  * Resolve bus configuration for a given working directory.
  *
- * Resolution order:
- * 1. AGENTSYNCLAYER_BUS_ID environment variable (highest priority)
- * 2. .agentsynclayer.json file in current directory only (no ancestor walk)
- * 3. Default: use cwd as bus identity
+ * Resolution order (per-field precedence):
+ * Each field is resolved independently:
+ * - AGENTSYNCLAYER_REDIS_URL > redis key > default
+ * - AGENTSYNCLAYER_BUS_ID > bus key > default
+ * - AGENTSYNCLAYER_DB_DIR > db key > default
  *
  * Results are cached per canonical cwd. Subsequent calls return
  * the cached result without re-resolving.
@@ -99,6 +108,7 @@ export function resetBusConfig(): void {
  * @example
  * const config = resolveBusConfig('/home/user/project');
  * console.log(config.projectHash); // e.g., 'a1b2c3d4e5f6'
+ * console.log(config.redis_url);     // e.g., 'redis://localhost:6379'
  * console.log(config.source);      // 'config', 'env', or 'default'
  */
 export function resolveBusConfig(cwd: string): BusConfig {
@@ -119,7 +129,7 @@ export function resolveBusConfig(cwd: string): BusConfig {
 
   let config: BusConfig | null;
 
-  // Phase 1: Check environment variable
+  // Phase 1: Check environment variables (highest priority for each field)
   config = resolveFromEnv();
   if (config) {
     configCache.set(canonicalCwd, config);
@@ -140,53 +150,124 @@ export function resolveBusConfig(cwd: string): BusConfig {
 }
 
 /**
- * Attempt to resolve config from AGENTSYNCLAYER_BUS_ID environment variable.
+ * Attempt to resolve config from environment variables.
  *
- * @returns BusConfig if env var is set and valid, null otherwise
+ * Checks AGENTSYNCLAYER_REDIS_URL, AGENTSYNCLAYER_BUS_ID, and AGENTSYNCLAYER_DB_DIR.
+ * Returns config with source: 'env' if ANY of these env vars is set.
+ *
+ * @returns BusConfig if any env var is set, null otherwise
  */
 function resolveFromEnv(): BusConfig | null {
-  const envValue = process.env.AGENTSYNCLAYER_BUS_ID;
-  if (!envValue) {
+  const hasRedis = 'AGENTSYNCLAYER_REDIS_URL' in process.env;
+  const hasBus = 'AGENTSYNCLAYER_BUS_ID' in process.env;
+  const hasDb = 'AGENTSYNCLAYER_DB_DIR' in process.env;
+
+  if (!hasRedis && !hasBus && !hasDb) {
     return null;
   }
 
-  try {
-    const busDir = fs.realpathSync(envValue);
-
-    // Log resolved path for operator transparency
-    console.warn(
-      '[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID resolved to:',
-      busDir,
-      '(from:',
-      envValue,
-      ')',
-    );
-
-    // Validate it's a directory
-    if (!fs.statSync(busDir).isDirectory()) {
-      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID is not a directory:', envValue);
-      return null;
+  // Resolve redis_url from env (if set)
+  let redisUrl: string | null = null;
+  if (hasRedis) {
+    const envRedis = process.env.AGENTSYNCLAYER_REDIS_URL;
+    if (envRedis && isValidRedisUrl(envRedis)) {
+      redisUrl = envRedis;
+      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_REDIS_URL resolved to:', redisUrl);
+    } else if (envRedis) {
+      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_REDIS_URL is invalid:', envRedis);
     }
+  }
 
-    // Validate bus_dir is creatable (mkdir -p will create it)
-    try {
-      fs.mkdirSync(busDir, { recursive: true });
-    } catch {
-      console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID db_dir is not creatable:', busDir);
-      return null;
+  // Resolve bus_dir from env (if set)
+  let busDir: string | null = null;
+  if (hasBus) {
+    const envBus = process.env.AGENTSYNCLAYER_BUS_ID;
+    if (envBus) {
+      try {
+        busDir = fs.realpathSync(envBus);
+        if (!fs.statSync(busDir).isDirectory()) {
+          console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID is not a directory:', envBus);
+          busDir = null;
+        } else {
+          // Validate bus_dir is creatable
+          try {
+            fs.mkdirSync(busDir, { recursive: true });
+          } catch {
+            console.warn(
+              '[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID directory is not creatable:',
+              busDir,
+            );
+            busDir = null;
+          }
+        }
+        if (busDir) {
+          console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID resolved to:', busDir);
+        }
+      } catch {
+        console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID path could not be resolved:', envBus);
+        busDir = null;
+      }
     }
+  }
 
-    return {
-      bus_dir: busDir,
-      db_dir: busDir,
-      projectHash: hashProjectPath(busDir),
-      source: 'env',
-      configPath: null,
-    };
-  } catch {
-    console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID path could not be resolved:', envValue);
+  // Resolve db_dir from env (if set)
+  let dbDir: string | null = null;
+  if (hasDb) {
+    const envDb = process.env.AGENTSYNCLAYER_DB_DIR;
+    if (envDb) {
+      try {
+        dbDir = fs.realpathSync(envDb);
+        if (!fs.statSync(dbDir).isDirectory()) {
+          console.warn('[AgentSyncLayer] AGENTSYNCLAYER_DB_DIR is not a directory:', envDb);
+          dbDir = null;
+        } else {
+          // Validate db_dir is creatable
+          try {
+            fs.mkdirSync(dbDir, { recursive: true });
+          } catch {
+            console.warn(
+              '[AgentSyncLayer] AGENTSYNCLAYER_DB_DIR directory is not creatable:',
+              dbDir,
+            );
+            dbDir = null;
+          }
+        }
+        if (dbDir) {
+          console.warn('[AgentSyncLayer] AGENTSYNCLAYER_DB_DIR resolved to:', dbDir);
+        }
+      } catch {
+        console.warn('[AgentSyncLayer] AGENTSYNCLAYER_DB_DIR path could not be resolved:', envDb);
+        dbDir = null;
+      }
+    }
+  }
+
+  // If any env var is set but none resolved successfully, still return null
+  // to allow fallback to config file or default
+  if (!hasRedis && !hasBus && !hasDb) {
     return null;
   }
+
+  // At this point, we have at least one env var set (even if resolution failed)
+  // But we need at least ONE field to come from env to return env-sourced config
+  // If ALL resolution attempts failed, return null to fall back
+  if (!redisUrl && !busDir && !dbDir) {
+    return null;
+  }
+
+  // If some fields resolved from env but others didn't, we need to get defaults for the rest
+  // Use current working directory as default basis
+  const cwd = process.cwd();
+  const defaultConfig = resolveToDefault(cwd);
+
+  return {
+    bus_dir: busDir ?? defaultConfig.bus_dir,
+    db_dir: dbDir ?? defaultConfig.db_dir,
+    redis_url: redisUrl ?? defaultConfig.redis_url,
+    projectHash: hashProjectPath(busDir ?? defaultConfig.bus_dir),
+    source: 'env',
+    configPath: null,
+  };
 }
 
 /**
@@ -216,7 +297,7 @@ function resolveFromLocalConfig(canonicalCwd: string): BusConfig | null {
 /**
  * Validate and parse a .agentsynclayer.json config file object.
  *
- * Only allows 'bus' and 'db' keys (strict mode). Both must be strings if present.
+ * Allows 'bus', 'db', and 'redis' keys (strict mode).
  *
  * @param raw - Parsed JSON value from the config file
  * @returns Validated config object
@@ -227,7 +308,7 @@ function validateConfigFile(raw: unknown): AgentSyncLayerConfigFile {
     throw new Error('Config must be a JSON object');
   }
   const obj = raw as Record<string, unknown>;
-  const allowedKeys = new Set(['bus', 'db']);
+  const allowedKeys = new Set(['bus', 'db', 'redis']);
   for (const key of Object.keys(obj)) {
     if (!allowedKeys.has(key)) {
       throw new Error(`Unknown key: ${key}`);
@@ -239,6 +320,7 @@ function validateConfigFile(raw: unknown): AgentSyncLayerConfigFile {
   return {
     bus: typeof obj.bus === 'string' ? obj.bus : undefined,
     db: typeof obj.db === 'string' ? obj.db : undefined,
+    redis: typeof obj.redis === 'string' ? obj.redis : undefined,
   };
 }
 
@@ -307,13 +389,40 @@ function parseConfig(configPath: string, configDir: string): BusConfig {
     throw new Error('db directory is not creatable');
   }
 
+  // Resolve redis_url (default: standard localhost)
+  let redisUrl = 'redis://localhost:6379';
+  if (raw.redis) {
+    if (isValidRedisUrl(raw.redis)) {
+      redisUrl = raw.redis;
+    } else {
+      console.warn('[AgentSyncLayer] Config redis URL is invalid:', raw.redis);
+      throw new Error('redis must be a valid Redis URL (redis:// or rediss://)');
+    }
+  }
+
   return {
     bus_dir: busDir,
     db_dir: dbDir,
+    redis_url: redisUrl,
     projectHash: hashProjectPath(busDir),
     source: 'config',
     configPath: path.resolve(configPath),
   };
+}
+
+/**
+ * Validate a Redis URL (must start with redis:// or rediss://).
+ *
+ * @param url - URL to validate
+ * @returns true if valid Redis URL
+ */
+function isValidRedisUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === 'redis:' || parsed.protocol === 'rediss:') && !!parsed.hostname;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -326,6 +435,7 @@ function resolveToDefault(canonicalCwd: string): BusConfig {
   return {
     bus_dir: canonicalCwd,
     db_dir: canonicalCwd,
+    redis_url: 'redis://localhost:6379',
     projectHash: hashProjectPath(canonicalCwd),
     source: 'default',
     configPath: null,
@@ -364,4 +474,21 @@ export function resolveProjectHash(cwd: string): string {
  */
 export function resolveDbDir(cwd: string): string {
   return resolveBusConfig(cwd).db_dir;
+}
+
+/**
+ * Get the Redis connection URL for a given working directory.
+ *
+ * Convenience function that resolves the bus config and returns its redis_url.
+ * Used by tools that need Redis connection URLs.
+ *
+ * @param cwd - The current working directory
+ * @returns Redis connection URL
+ *
+ * @example
+ * const redisUrl = resolveRedisUrl('/home/user/project');
+ * // Returns: 'redis://localhost:6379'
+ */
+export function resolveRedisUrl(cwd: string): string {
+  return resolveBusConfig(cwd).redis_url;
 }

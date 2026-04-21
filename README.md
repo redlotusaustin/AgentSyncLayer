@@ -79,13 +79,13 @@ AgentSyncLayer provides 11 tools for agent coordination:
 
 ### Runtime
 
-- **Bun** ≥ 1.0.0
 - **Redis** ≥ 6.0 (localhost on port 6379 by default)
 - **OpenCode** plugin-compatible environment
 
-### Environment
+### Development (optional)
 
-Redis must be accessible on `localhost:6379` unless configured otherwise via `AGENTSYNCLAYER_REDIS_URL`.
+- **Bun** ≥ 1.0.0 (for running tests, local development)
+- Note: OpenCode automatically installs NPM plugin dependencies via Bun
 
 ---
 
@@ -113,15 +113,15 @@ redis-cli ping
 # Should return: PONG
 ```
 
-### 2. Install AgentSyncLayer
+### 2. Verify Plugin Loaded
+
+In OpenCode, run:
 
 ```bash
-# Install dependencies
-bun install
-
-# Verify TypeScript compiles
-bun run typecheck
+bus_info()
 ```
+
+Should return configuration including project hash and bus directory.
 
 ### 3. Load in OpenCode
 
@@ -136,23 +136,36 @@ AgentSyncLayer integrates as an OpenCode plugin. The exact loading mechanism dep
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AGENTSYNCLAYER_REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `AGENTSYNCLAYER_BUS_ID` | _(none)_ | Override bus identity with a directory path. Takes highest precedence over config files. |
+| Variable | Description |
+|----------|-------------|
+| `AGENTSYNCLAYER_REDIS_URL` | Redis connection URL (e.g., `redis://localhost:6379`) |
+| `AGENTSYNCLAYER_BUS_ID` | Bus directory for shared namespace |
+| `AGENTSYNCLAYER_DB_DIR` | Database directory for SQLite history |
 
-**Examples:**
+### Config File (.agentsynclayer.json)
 
-```bash
-# Use default localhost Redis
-export AGENTSYNCLAYER_REDIS_URL=redis://localhost:6379
+Create a `.agentsynclayer.json` file in your project directory:
 
-# Use custom host and port
-export AGENTSYNCLAYER_REDIS_URL=redis://192.168.1.100:6380
+| Key | Description |
+|-----|-------------|
+| `redis` | Redis connection URL (e.g., `redis://custom:6379`) |
+| `bus` | Bus directory for shared namespace |
+| `db` | Database directory for SQLite history |
 
-# Use Unix socket
-export AGENTSYNCLAYER_REDIS_URL=unix:///var/run/redis/redis.sock
+```json
+{
+  "redis": "redis://redis-server:6379",
+  "bus": "/shared/workspace",
+  "db": "/shared/data"
+}
 ```
+
+### Precedence
+
+Each option is resolved independently:
+- Environment variable > config file > default
+
+For example, you can set `AGENTSYNCLAYER_REDIS_URL` via environment variable while using the config file for `bus` and `db`.
 
 ### Project Isolation
 
@@ -173,7 +186,9 @@ For monorepos and multi-project setups, you can share a bus namespace across dif
 
 ```json
 {
-  "bus": "/path/to/shared/root"
+  "bus": "/path/to/shared/root",
+  "db": "/path/to/shared/data",
+  "redis": "redis://shared-redis:6379"
 }
 ```
 
@@ -197,10 +212,11 @@ Place `.agentsynclayer.json` in each package that needs the shared bus:
 
 Now agents in `/mono/packages/api` and `/mono/packages/web` share the same bus, see each other's messages, and use the same SQLite history database.
 
-**Configuration precedence (highest to lowest):**
-1. `AGENTSYNCLAYER_BUS_ID` environment variable
-2. `.agentsynclayer.json` in current directory only (no ancestor walk)
-3. Default: use current working directory
+**Configuration precedence:**
+Each field is resolved independently:
+- `AGENTSYNCLAYER_REDIS_URL` > `redis` key > default
+- `AGENTSYNCLAYER_BUS_ID` > `bus` key > default  
+- `AGENTSYNCLAYER_DB_DIR` > `db` key > default
 
 ---
 

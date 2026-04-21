@@ -248,6 +248,7 @@ export interface BusInfoResponseData {
   projectHash: string;
   bus_dir: string;
   db_dir: string;
+  redis_url: string;
   source: 'env' | 'config' | 'default';
   configPath: string | null;
 }

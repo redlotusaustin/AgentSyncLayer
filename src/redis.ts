@@ -6,7 +6,6 @@
  *
  * Features:
  * - Connects to localhost:6379 by default
- * - Supports AGENTSYNCLAYER_REDIS_URL environment variable override
  * - Tracks connection state via `connected` getter
  * - Provides `checkConnection()` helper for tools to verify connectivity
  * - Handles connection events (ready, error, close, reconnecting)
@@ -81,12 +80,11 @@ export class RedisClient {
    * Create a new Redis client wrapper
    *
    * @param config - Optional Redis configuration
-   *                 If AGENTSYNCLAYER_REDIS_URL is set, it will be used instead of defaults
+   *                 url from config takes precedence over default
    */
   constructor(config?: RedisConfig) {
-    // Determine URL: AGENTSYNCLAYER_REDIS_URL env var > config.url > default localhost:6379
-    const redisUrl =
-      process.env.AGENTSYNCLAYER_REDIS_URL ?? config?.url ?? 'redis://localhost:6379';
+    // Determine URL: config.url > default localhost:6379
+    const redisUrl = config?.url ?? 'redis://localhost:6379';
 
     this.maxRetries = config?.maxRetries ?? 3;
     this.retryDelayMs = config?.retryDelayMs ?? 1000;
@@ -409,12 +407,12 @@ export function resetRedisClient(): void {
 }
 
 /**
- * Create a Redis client with environment-aware configuration
+ * Create a Redis client with the specified URL
  *
- * Helper function that creates a client using AGENTSYNCLAYER_REDIS_URL
- * if set, or the provided URL otherwise.
+ * Helper function that creates a client with the provided URL
+ * or default localhost:6379 if none provided.
  *
- * @param url - Fallback URL if AGENTSYNCLAYER_REDIS_URL is not set
+ * @param url - Fallback URL (defaults to redis://localhost:6379)
  * @returns A new RedisClient instance
  */
 export function createRedisClient(url?: string): RedisClient {

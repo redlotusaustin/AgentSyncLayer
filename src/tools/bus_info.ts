@@ -35,6 +35,7 @@ export async function busInfoExecute(
         projectHash: config.projectHash,
         bus_dir: config.bus_dir,
         db_dir: config.db_dir,
+        redis_url: config.redis_url,
         source: config.source,
         configPath: config.configPath,
       },

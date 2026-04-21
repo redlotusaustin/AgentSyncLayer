@@ -351,8 +351,8 @@ const state: PluginState = {
 export const AgentSyncLayerPlugin: Plugin = async (input: PluginInput) => {
   try {
     const { directory } = input;
-    const redis = getRedisClient();
     const busConfig = resolveBusConfig(directory);
+    const redis = getRedisClient({ url: busConfig.redis_url });
     const projectHash = busConfig.projectHash;
     const dbDir = busConfig.db_dir;
     const agentId = getSessionAgentId(); // Same ID as tools use!
