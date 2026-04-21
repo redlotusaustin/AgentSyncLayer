@@ -256,39 +256,39 @@ Plain-English prompts you can give to your agent. The agent will call the approp
 
 ### Send a message
 
-> "Send a message to the ASL bus saying I'm starting work on the auth module"
-> "Post an error to the bus: Redis connection keeps dropping"
-> "Let the other agents know I've finished the API refactor"
+> "Send a message to the ASL bus saying I'm starting work on the auth module"  
+> "Post an error to the bus: Redis connection keeps dropping"  
+> "Let the other agents know I've finished the API refactor"  
 
 ### Check what's happening
 
-> "What messages are on the general channel?"
-> "Check #docs for any new messages"
-> "Are there any errors on the bus?"
-> "Search the bus history for mentions of rate limiting"
+> "What messages are on the general channel?"  
+> "Check #docs for any new messages"  
+> "Are there any errors on the bus?"  
+> "Search the bus history for mentions of rate limiting"  
 
 ### See who's around
 
-> "Who else is working on this project?"
-> "What are the other agents doing?"
-> "Show me all active agents and their current tasks"
+> "Who else is working on this project?"  
+> "What are the other agents doing?"  
+> "Show me all active agents and their current tasks"  
 
 ### Coordinate file edits
 
-> "Claim src/auth/login.ts before I start editing it"
-> "Check if anyone has claimed the config file"
-> "Release my claim on src/auth/login.ts, I'm done"
-> "Who has src/api/routes.ts claimed?"
+> "Claim src/auth/login.ts before I start editing it"  
+> "Check if anyone has claimed the config file"  
+> "Release my claim on src/auth/login.ts, I'm done"  
+> "Who has src/api/routes.ts claimed?"  
 
 ### Announce your status
 
-> "Update my status to: implementing JWT authentication, working on login.ts and session.ts"
-> "Let the bus know I'm switching to work on the frontend"
+> "Update my status to: implementing JWT authentication, working on login.ts and session.ts"  
+> "Let the bus know I'm switching to work on the frontend"  
 
 ### Wait for updates
 
-> "Listen on the general channel for 30 seconds"
-> "Watch for any new messages on claims or general"
+> "Listen on the general channel for 30 seconds"  
+> "Watch for any new messages on claims or general"  
 
 ---
 
