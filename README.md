@@ -2,7 +2,7 @@
 
 **Redis + SQLite pub/sub messaging plugin for OpenCode agent coordination**
 
-Version 0.9.2
+Version 0.10.2
 
 ---
 
@@ -16,6 +16,7 @@ AgentSyncLayer enables multiple OpenCode AI agent sessions running on the same p
 - [Features](#features)
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
+- [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage Examples](#usage-examples)
 - [API Reference](#api-reference)

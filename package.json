@@ -1,6 +1,6 @@
 {
   "name": "opencode-asl",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Hybrid Redis/SQLite-backed inter-agent communication bus for OpenCode",
   "license": "MIT",
   "type": "module",
