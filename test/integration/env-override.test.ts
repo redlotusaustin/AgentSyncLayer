@@ -1,7 +1,7 @@
 /**
  * Env Var Override Tests (I2)
  *
- * Tests that the AGENTSYNCLAYER_BUS_ID environment variable overrides
+ * Tests that the AGENTSYNCLAYER_BUS_DIR environment variable overrides
  * .agentsynclayer.json and default behavior correctly.
  *
  * Tests: I2.1-I2.2
@@ -93,14 +93,14 @@ describe('I2: Env Var Override', () => {
     setSessionAgentId(null);
   });
 
-  describe('I2.1: Shared bus via AGENTSYNCLAYER_BUS_ID', () => {
+  describe('I2.1: Shared bus via AGENTSYNCLAYER_BUS_DIR', () => {
     test('two agents in different directories share a bus via env var', async () => {
       const { dir: dir1, sharedDir, cleanup: cleanup1 } = createTestDir();
       const { dir: dir2, cleanup: cleanup2 } = createTestDir();
 
       try {
-        // Set AGENTSYNCLAYER_BUS_ID to shared directory
-        process.env.AGENTSYNCLAYER_BUS_ID = sharedDir;
+        // Set AGENTSYNCLAYER_BUS_DIR to shared directory
+        process.env.AGENTSYNCLAYER_BUS_DIR = sharedDir;
         resetBusConfig();
 
         const agent1Id = generateTestAgentId('env1');
@@ -159,8 +159,8 @@ describe('I2: Env Var Override', () => {
       const { dir: dir2, cleanup: cleanup2 } = createTestDir();
 
       try {
-        // Set AGENTSYNCLAYER_BUS_ID
-        process.env.AGENTSYNCLAYER_BUS_ID = sharedDir;
+        // Set AGENTSYNCLAYER_BUS_DIR
+        process.env.AGENTSYNCLAYER_BUS_DIR = sharedDir;
         resetBusConfig();
 
         // Both directories should resolve to the same projectHash
@@ -186,7 +186,7 @@ describe('I2: Env Var Override', () => {
       const { dir: dir2, cleanup: cleanup2 } = createTestDir();
 
       try {
-        process.env.AGENTSYNCLAYER_BUS_ID = sharedDir;
+        process.env.AGENTSYNCLAYER_BUS_DIR = sharedDir;
         resetBusConfig();
 
         const agent1Id = generateTestAgentId('env1');
@@ -221,9 +221,9 @@ describe('I2: Env Var Override', () => {
 
       try {
         // Create .agentsynclayer.json in cwd pointing to cwd
-        // But set AGENTSYNCLAYER_BUS_ID to different directory
+        // But set AGENTSYNCLAYER_BUS_DIR to different directory
         // Also set DB_DIR to test per-field precedence
-        process.env.AGENTSYNCLAYER_BUS_ID = sharedDir;
+        process.env.AGENTSYNCLAYER_BUS_DIR = sharedDir;
         process.env.AGENTSYNCLAYER_DB_DIR = sharedDir;
         resetBusConfig();
 
@@ -251,7 +251,7 @@ describe('I2: Env Var Override', () => {
 
       try {
         // Create different configs - set both to test per-field precedence
-        process.env.AGENTSYNCLAYER_BUS_ID = sharedDir;
+        process.env.AGENTSYNCLAYER_BUS_DIR = sharedDir;
         process.env.AGENTSYNCLAYER_DB_DIR = sharedDir;
         resetBusConfig();
 
@@ -259,7 +259,7 @@ describe('I2: Env Var Override', () => {
         expect(configFromEnv.source).toBe('env');
 
         // Unset env vars and resolve again
-        delete process.env.AGENTSYNCLAYER_BUS_ID;
+        delete process.env.AGENTSYNCLAYER_BUS_DIR;
         delete process.env.AGENTSYNCLAYER_DB_DIR;
         resetBusConfig();
 
@@ -283,7 +283,7 @@ describe('I2: Env Var Override', () => {
         fs.writeFileSync(path.join(rootDir, '.agentsynclayer.json'), JSON.stringify({ bus: '.' }));
 
         // Set env var to different directory
-        process.env.AGENTSYNCLAYER_BUS_ID = envDir;
+        process.env.AGENTSYNCLAYER_BUS_DIR = envDir;
         resetBusConfig();
 
         // Resolve from subdir - should use env var

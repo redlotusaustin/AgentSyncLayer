@@ -96,7 +96,7 @@ export function resetBusConfig(): void {
  * Resolution order (per-field precedence):
  * Each field is resolved independently:
  * - AGENTSYNCLAYER_REDIS_URL > redis key > default
- * - AGENTSYNCLAYER_BUS_ID > bus key > default
+ * - AGENTSYNCLAYER_BUS_DIR (or BUS_ID) > bus key > default
  * - AGENTSYNCLAYER_DB_DIR > db key > default
  *
  * Results are cached per canonical cwd. Subsequent calls return
@@ -152,14 +152,14 @@ export function resolveBusConfig(cwd: string): BusConfig {
 /**
  * Attempt to resolve config from environment variables.
  *
- * Checks AGENTSYNCLAYER_REDIS_URL, AGENTSYNCLAYER_BUS_ID, and AGENTSYNCLAYER_DB_DIR.
+ * Checks AGENTSYNCLAYER_REDIS_URL, AGENTSYNCLAYER_BUS_DIR, and AGENTSYNCLAYER_DB_DIR.
  * Returns config with source: 'env' if ANY of these env vars is set.
  *
  * @returns BusConfig if any env var is set, null otherwise
  */
 function resolveFromEnv(): BusConfig | null {
   const hasRedis = 'AGENTSYNCLAYER_REDIS_URL' in process.env;
-  const hasBus = 'AGENTSYNCLAYER_BUS_ID' in process.env;
+  const hasBus = 'AGENTSYNCLAYER_BUS_DIR' in process.env;
   const hasDb = 'AGENTSYNCLAYER_DB_DIR' in process.env;
 
   if (!hasRedis && !hasBus && !hasDb) {
@@ -181,30 +181,27 @@ function resolveFromEnv(): BusConfig | null {
   // Resolve bus_dir from env (if set)
   let busDir: string | null = null;
   if (hasBus) {
-    const envBus = process.env.AGENTSYNCLAYER_BUS_ID;
+    const envBus = process.env.AGENTSYNCLAYER_BUS_DIR;
     if (envBus) {
       try {
         busDir = fs.realpathSync(envBus);
         if (!fs.statSync(busDir).isDirectory()) {
-          console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID is not a directory:', envBus);
+          console.warn('[AgentSyncLayer] Bus directory is not a directory:', envBus);
           busDir = null;
         } else {
           // Validate bus_dir is creatable
           try {
             fs.mkdirSync(busDir, { recursive: true });
           } catch {
-            console.warn(
-              '[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID directory is not creatable:',
-              busDir,
-            );
+            console.warn('[AgentSyncLayer] Bus directory is not creatable:', busDir);
             busDir = null;
           }
         }
         if (busDir) {
-          console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID resolved to:', busDir);
+          console.warn('[AgentSyncLayer] Bus directory resolved to:', busDir);
         }
       } catch {
-        console.warn('[AgentSyncLayer] AGENTSYNCLAYER_BUS_ID path could not be resolved:', envBus);
+        console.warn('[AgentSyncLayer] Bus directory path could not be resolved:', envBus);
         busDir = null;
       }
     }

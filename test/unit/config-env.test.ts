@@ -5,7 +5,7 @@ import { resetBusConfig, resolveBusConfig } from '../../src/config';
 import { createTestBusEnv } from '../helpers';
 
 describe('config-env (T2)', () => {
-  const originalEnvBusId = process.env.AGENTSYNCLAYER_BUS_ID;
+  const originalEnvBusId = process.env.AGENTSYNCLAYER_BUS_DIR;
 
   beforeAll(() => {
     // Ensure clean state
@@ -15,9 +15,9 @@ describe('config-env (T2)', () => {
   afterAll(() => {
     // Restore original env var
     if (originalEnvBusId !== undefined) {
-      process.env.AGENTSYNCLAYER_BUS_ID = originalEnvBusId;
+      process.env.AGENTSYNCLAYER_BUS_DIR = originalEnvBusId;
     } else {
-      delete process.env.AGENTSYNCLAYER_BUS_ID;
+      delete process.env.AGENTSYNCLAYER_BUS_DIR;
     }
     resetBusConfig();
   });
@@ -25,15 +25,15 @@ describe('config-env (T2)', () => {
   afterEach(() => {
     resetBusConfig();
     // Clean up env var between tests
-    delete process.env.AGENTSYNCLAYER_BUS_ID;
+    delete process.env.AGENTSYNCLAYER_BUS_DIR;
   });
 
-  test('T2.1: AGENTSYNCLAYER_BUS_ID=/tmp/test-bus → source: env', () => {
+  test('T2.1: AGENTSYNCLAYER_BUS_DIR=/tmp/test-bus → source: env', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
       // Create the directory that will be referenced by the env var
       fs.mkdirSync(root, { recursive: true });
-      process.env.AGENTSYNCLAYER_BUS_ID = root;
+      process.env.AGENTSYNCLAYER_BUS_DIR = root;
 
       const config = resolveBusConfig(root);
       expect(config.source).toBe('env');
@@ -49,7 +49,7 @@ describe('config-env (T2)', () => {
       const subdir = path.join(root, 'subdir');
       fs.mkdirSync(subdir, { recursive: true });
       // Use absolute path (env var expects absolute or resolvable paths)
-      process.env.AGENTSYNCLAYER_BUS_ID = subdir;
+      process.env.AGENTSYNCLAYER_BUS_DIR = subdir;
 
       const config = resolveBusConfig(root);
       expect(config.source).toBe('env');
@@ -71,7 +71,7 @@ describe('config-env (T2)', () => {
       fs.writeFileSync(path.join(root, '.agentsynclayer.json'), JSON.stringify({ bus: subdir1 }));
 
       // But env var points to subdir2
-      process.env.AGENTSYNCLAYER_BUS_ID = subdir2;
+      process.env.AGENTSYNCLAYER_BUS_DIR = subdir2;
 
       const config = resolveBusConfig(root);
       expect(config.source).toBe('env');
@@ -84,7 +84,7 @@ describe('config-env (T2)', () => {
   test('T2.4: non-existent path → source: default', () => {
     const { root, cleanup } = createTestBusEnv();
     try {
-      process.env.AGENTSYNCLAYER_BUS_ID = '/non/existent/path/that/does/not/exist';
+      process.env.AGENTSYNCLAYER_BUS_DIR = '/non/existent/path/that/does/not/exist';
 
       const config = resolveBusConfig(root);
       expect(config.source).toBe('default');
@@ -98,7 +98,7 @@ describe('config-env (T2)', () => {
     try {
       const dir = path.join(root, 'mybus');
       fs.mkdirSync(dir, { recursive: true });
-      process.env.AGENTSYNCLAYER_BUS_ID = dir;
+      process.env.AGENTSYNCLAYER_BUS_DIR = dir;
 
       // First resolution
       const config1 = resolveBusConfig(root);
@@ -108,7 +108,7 @@ describe('config-env (T2)', () => {
       resetBusConfig();
       const newDir = path.join(root, 'mybus2');
       fs.mkdirSync(newDir, { recursive: true });
-      process.env.AGENTSYNCLAYER_BUS_ID = newDir;
+      process.env.AGENTSYNCLAYER_BUS_DIR = newDir;
 
       // New resolution should pick up the new env var
       const config2 = resolveBusConfig(root);

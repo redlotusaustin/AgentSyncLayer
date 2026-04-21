@@ -134,23 +134,40 @@ AgentSyncLayer integrates as an OpenCode plugin. The exact loading mechanism dep
 
 ## Configuration
 
+AgentSyncLayer has three configurable options. Each can be set via environment variable, config file, or left at its default. They are resolved **independently** — mix and match any combination.
+
+| Option | What it controls | Env var | Config key | Default |
+|--------|-----------------|---------|------------|---------|
+| **Redis URL** | Where the Redis server is | `AGENTSYNCLAYER_REDIS_URL` | `redis` | `redis://localhost:6379` |
+| **Bus directory** | Which project namespace agents share | `AGENTSYNCLAYER_BUS_DIR` | `bus` | Current working directory |
+| **DB directory** | Where SQLite history is stored | `AGENTSYNCLAYER_DB_DIR` | `db` | Same as bus directory |
+
+### Understanding bus_dir vs db_dir
+
+These are separate because they serve different purposes:
+
+- **Bus directory** determines the **project hash** — a 12-character hex string derived from the directory path. This hash is used as the Redis key prefix, so agents in different directories can't see each other's messages. Setting this to a shared path (e.g., `/mono/root`) lets multiple worktrees or packages share a single namespace.
+
+- **DB directory** determines where the **SQLite history database** is written. Defaults to the bus directory, but can be pointed elsewhere if you want shared messaging with separate history storage.
+
+In most setups they're the same directory and you don't need to think about it. Override them independently only when you have a specific reason (e.g., shared Redis namespace but per-project history files).
+
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `AGENTSYNCLAYER_REDIS_URL` | Redis connection URL (e.g., `redis://localhost:6379`) |
-| `AGENTSYNCLAYER_BUS_ID` | Bus directory for shared namespace |
-| `AGENTSYNCLAYER_DB_DIR` | Database directory for SQLite history |
+```bash
+# Point to a shared Redis instance
+export AGENTSYNCLAYER_REDIS_URL=redis://redis-server:6379
+
+# Share a bus namespace across monorepo packages
+export AGENTSYNCLAYER_BUS_DIR=/home/dev/monorepo
+
+# Store history DB in a dedicated location
+export AGENTSYNCLAYER_DB_DIR=/home/dev/.cache/agentsynclayer
+```
 
 ### Config File (.agentsynclayer.json)
 
 Create a `.agentsynclayer.json` file in your project directory:
-
-| Key | Description |
-|-----|-------------|
-| `redis` | Redis connection URL (e.g., `redis://custom:6379`) |
-| `bus` | Bus directory for shared namespace |
-| `db` | Database directory for SQLite history |
 
 ```json
 {
@@ -162,7 +179,7 @@ Create a `.agentsynclayer.json` file in your project directory:
 
 ### Precedence
 
-Each option is resolved independently:
+Each option is resolved independently (per-field precedence):
 - Environment variable > config file > default
 
 For example, you can set `AGENTSYNCLAYER_REDIS_URL` via environment variable while using the config file for `bus` and `db`.
@@ -215,7 +232,7 @@ Now agents in `/mono/packages/api` and `/mono/packages/web` share the same bus, 
 **Configuration precedence:**
 Each field is resolved independently:
 - `AGENTSYNCLAYER_REDIS_URL` > `redis` key > default
-- `AGENTSYNCLAYER_BUS_ID` > `bus` key > default  
+- `AGENTSYNCLAYER_BUS_DIR` > `bus` key > default
 - `AGENTSYNCLAYER_DB_DIR` > `db` key > default
 
 ---

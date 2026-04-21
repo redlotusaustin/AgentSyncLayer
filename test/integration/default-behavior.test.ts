@@ -65,7 +65,7 @@ describe('I3: Default Behavior', () => {
   beforeEach(() => {
     resetBusConfig();
     // Ensure no env var is set
-    delete process.env.AGENTSYNCLAYER_BUS_ID;
+    delete process.env.AGENTSYNCLAYER_BUS_DIR;
   });
 
   afterEach(() => {

@@ -47,13 +47,13 @@ describe('bus-info (T7)', () => {
   });
 
   test('T7.3: bus_info with env var → source: env, configPath: null', async () => {
-    const originalEnvBusId = process.env.AGENTSYNCLAYER_BUS_ID;
+    const originalEnvBusId = process.env.AGENTSYNCLAYER_BUS_DIR;
     try {
       const { root, cleanup } = createTestBusEnv();
       try {
         const dir = path.join(root, 'env-bus');
         fs.mkdirSync(dir, { recursive: true });
-        process.env.AGENTSYNCLAYER_BUS_ID = dir;
+        process.env.AGENTSYNCLAYER_BUS_DIR = dir;
 
         const context = createTestToolContext(root);
         const result = await busInfoExecute({}, context);
@@ -65,11 +65,11 @@ describe('bus-info (T7)', () => {
         }
       } finally {
         cleanup();
-        delete process.env.AGENTSYNCLAYER_BUS_ID;
+        delete process.env.AGENTSYNCLAYER_BUS_DIR;
       }
     } finally {
       if (originalEnvBusId !== undefined) {
-        process.env.AGENTSYNCLAYER_BUS_ID = originalEnvBusId;
+        process.env.AGENTSYNCLAYER_BUS_DIR = originalEnvBusId;
       }
     }
   });
